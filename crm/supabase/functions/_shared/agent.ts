@@ -196,8 +196,7 @@ export async function generateAgentReply(
         model: 'gpt-4o-mini',
         messages,
         temperature: 0.7,
-        max_tokens: 600,
-        response_format: { type: "json_object" }
+        max_tokens: 600
       }),
     });
 
