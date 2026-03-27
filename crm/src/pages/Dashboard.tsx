@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
-import { RefreshCw, Search, Zap, LayoutDashboard, Columns, Plus } from 'lucide-react'
+import { RefreshCw, Search, Zap, LayoutDashboard, Columns, Plus, Smartphone } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import type { Lead, PipelineStage } from '../lib/supabase'
 import KpiHeader from '../components/KpiHeader'
@@ -13,6 +14,7 @@ const STAGES_COLORS: Record<number, string> = {
 }
 
 export default function Dashboard() {
+  const navigate = useNavigate()
   const [activeTab, setActiveTab] = useState<'metrics' | 'pipeline'>('metrics')
   const [leads, setLeads] = useState<Lead[]>([])
   const [stages, setStages] = useState<PipelineStage[]>([])
@@ -123,6 +125,14 @@ export default function Dashboard() {
               style={{ width: '200px' }}
             />
           </div>
+          <button 
+            className="btn btn-secondary" 
+            style={{ marginRight: '12px' }}
+            onClick={() => navigate('/whatsapp')}
+          >
+            <Smartphone size={16} />
+            Conectar WhatsApp
+          </button>
           <button 
             className="btn btn-primary" 
             style={{ marginRight: '12px' }}
