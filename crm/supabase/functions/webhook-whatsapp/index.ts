@@ -132,7 +132,8 @@ function normalizeJid(rawJid: string, event: any, dataObj: any): string {
     if (
       typeof candidate === 'string' && 
       candidate.includes('@s.whatsapp.net') &&
-      !candidate.includes('553186460883') // Não usa o número do agente como normalização
+      !candidate.includes('553186460883') && // antigo número do agente
+      !candidate.includes('5538999273737')   // novo número do agente Ponto Zero
     ) {
       return candidate;
     }
