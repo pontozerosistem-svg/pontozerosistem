@@ -18,6 +18,7 @@ export default function App() {
             <WhatsAppSetup />
           </AuthGuard>
       } />
+      <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   )
 }
