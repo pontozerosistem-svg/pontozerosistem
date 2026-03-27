@@ -252,9 +252,9 @@ async function processMessage(jid: string, userText: string) {
 
     await supabase.from('agent_state').insert({
       lead_id:    newLead!.id,
-      spin_phase: 'situacao',
+      spin_phase: 'recepcao',
       spin_data:  {},
-      follow_up_count: 0 // Começa em 0 porque nunca falamos com ele
+      follow_up_count: 0
     });
 
     await logActivity(newLead!.id, 'stage_change', 'Lead criado via WhatsApp direto', null, STAGES.NOVO_LEAD);
@@ -262,7 +262,7 @@ async function processMessage(jid: string, userText: string) {
     lead = {
       ...newLead,
       stage_id:    STAGES.NOVO_LEAD,
-      agent_state: [{ spin_phase: 'situacao', spin_data: {}, follow_up_count: 0 }],
+      agent_state: [{ spin_phase: 'recepcao', spin_data: {}, follow_up_count: 0 }],
     };
 
     console.log(`[whatsapp] Novo lead criado via WhatsApp direto: ${jid}`);
@@ -307,9 +307,31 @@ async function processMessage(jid: string, userText: string) {
   // Inverte para que a ordem no prompt seja cronológica (mais antigas → mais novas)
   const history = (historyRaw ?? []).reverse();
 
-  // ── Gera resposta via agente SPIN ───────────────────────
-  const { reply, newPhase, spinData, score, nextStage, notes } =
-    await generateAgentReply(history ?? [], agentState, lead);
+  // ── Gera resposta via agente Gemini ────────────────────
+  const agentInput = {
+    ...agentState,
+    phase: agentState.spin_phase, // mapeia para o novo campo
+  };
+  const { reply: rawReply, newPhase, spinData, score, nextStage, notes } =
+    await generateAgentReply(history ?? [], agentInput, lead);
+
+  // ── Injeta link de agendamento se agente propôs reunião ─
+  const BOOKING_URL = Deno.env.get('GOOGLE_CALENDAR_BOOKING_URL') || 'https://cal.google.com/u/0/r';
+  const hasBookingTag = rawReply.includes('[ENVIAR_LINK_AGENDAMENTO]');
+  const reply = rawReply.replace(
+    '[ENVIAR_LINK_AGENDAMENTO]',
+    `\n\n📅 *Agende sua Reunião de Descoberta (gratuita):*\n${BOOKING_URL}`
+  );
+
+  // Se usou a tag, registra na tabela meetings
+  if (hasBookingTag) {
+    await supabase.from('meetings').insert({
+      lead_id: leadId,
+      calendar_booking_url: BOOKING_URL,
+      status: 'proposed',
+    }).select().maybeSingle();
+    console.log(`[calendar] Link de agendamento enviado para lead ${leadId}`);
+  }
 
   // ── Salva resposta do agente ────────────────────────────
   await saveMessage(leadId, 'assistant', reply);
@@ -323,9 +345,9 @@ async function processMessage(jid: string, userText: string) {
   }).eq('lead_id', leadId);
 
   // ── Atualiza nome do lead se o agente coletou ──────────
-  if (spinData?.nome && !lead.name) {
+  if ((spinData as any)?.nome && !lead.name) {
     await supabase.from('leads')
-      .update({ name: spinData.nome })
+      .update({ name: (spinData as any).nome })
       .eq('id', leadId);
   }
 
