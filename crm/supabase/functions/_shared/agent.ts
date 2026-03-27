@@ -222,9 +222,14 @@ export async function generateAgentReply(
     const phase     = String(parsed.phase ?? state.phase);
     const nextStage = (parsed.next_stage as number | null) ?? null;
     const notes     = String(parsed.notes ?? '');
+    
+    let finalReply = String(parsed.reply ?? '').trim();
+    if (!finalReply) {
+      finalReply = 'Perfeito! Fico feliz com a sua decisão. Escolha o melhor horário na agenda do Peu por aqui: [ENVIAR_LINK_AGENDAMENTO]';
+    }
 
     return {
-      reply:    String(parsed.reply ?? ''),
+      reply:    finalReply,
       newPhase: phase,
       spinData: {},
       score,
@@ -233,8 +238,9 @@ export async function generateAgentReply(
     };
   } catch (error: any) {
     console.error('[generateAgentReply] Erro fatal:', error);
+    const errMsg = error?.message ? String(error.message) : 'Erro desconhecido';
     return {
-      reply:    `[Erro de IA: ${error.message.substring(0, 100)}...]`,
+      reply:    `[🚨 Erro de IA: não consegui gerar a resposta. Verifique a chave de API da OpenAI. Detalhe: ${errMsg.substring(0, 60)}]`,
       newPhase: state.phase,
       spinData: {},
       score:    0,
