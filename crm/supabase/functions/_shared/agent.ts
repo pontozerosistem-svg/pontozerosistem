@@ -167,61 +167,48 @@ export async function generateAgentReply(
   const systemPrompt = buildSystemPrompt(state, lead);
   console.log(`[agent] Lead ${lead.id} | Phase: ${state.phase} | Msgs: ${state.follow_up_count}`);
 
-  // Formata histórico para o Gemini (user/model alternados)
-  const contents: {role: string; parts: {text: string}[]}[] = [];
+  // Formata histórico para o OpenAI
+  const messages: {role: string; content: string}[] = [];
 
-  // Injeta o system prompt como primeira mensagem do usuário (workaround para Gemini)
-  contents.push({
-    role: 'user',
-    parts: [{ text: `INSTRUÇÕES DO SISTEMA:\n${systemPrompt}` }]
-  });
-  contents.push({
-    role: 'model',
-    parts: [{ text: 'Entendido. Vou seguir as instruções e responder em JSON.' }]
+  messages.push({
+    role: 'system',
+    content: systemPrompt
   });
 
-  // Adiciona o histórico de conversa
   for (const msg of history) {
-    const geminiRole = msg.role === 'assistant' ? 'model' : 'user';
-    contents.push({
-      role: geminiRole,
-      parts: [{ text: msg.content }]
+    messages.push({
+      role: msg.role === 'assistant' ? 'assistant' : 'user',
+      content: msg.content
     });
   }
 
-  // Garante que a última mensagem seja do usuário
-  if (contents[contents.length - 1].role === 'model') {
-    contents.push({
-      role: 'user',
-      parts: [{ text: 'Continue a conversa seguindo as instruções e retorne apenas JSON.' }]
-    });
-  }
-
-  const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY')!;
-  const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`;
+  const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY')!;
+  const endpoint = 'https://api.openai.com/v1/chat/completions';
 
   try {
     const res = await fetch(endpoint, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${OPENAI_API_KEY}`
+      },
       body: JSON.stringify({
-        contents,
-        generationConfig: {
-          temperature: 0.7,
-          maxOutputTokens: 600,
-          responseMimeType: 'application/json',
-        },
+        model: 'gpt-4o-mini',
+        messages,
+        temperature: 0.7,
+        max_tokens: 600,
+        response_format: { type: "json_object" }
       }),
     });
 
     const data = await res.json();
 
-    if (!data.candidates || data.candidates.length === 0) {
-      console.error('[Gemini Error]', JSON.stringify(data));
-      throw new Error(`Gemini Error: ${JSON.stringify(data)}`);
+    if (!data.choices || data.choices.length === 0) {
+      console.error('[OpenAI Error]', JSON.stringify(data));
+      throw new Error(`OpenAI Error: ${JSON.stringify(data)}`);
     }
 
-    const rawText = data.candidates[0].content.parts[0].text ?? '{}';
+    const rawText = data.choices[0].message.content ?? '{}';
 
     let parsed: Record<string, unknown>;
     try {
