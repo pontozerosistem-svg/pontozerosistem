@@ -7,15 +7,11 @@ export default function App() {
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
-      <Route path="/" element={<Navigate to="/crm" replace />} />
-      <Route 
-        path="/crm" 
-        element={
+      <Route path="/" element={
           <AuthGuard>
             <Dashboard />
           </AuthGuard>
-        } 
-      />
+      } />
     </Routes>
   )
 }
