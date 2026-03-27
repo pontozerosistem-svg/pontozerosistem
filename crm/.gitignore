@@ -1,0 +1,23 @@
+# Dependências
+node_modules/
+dist/
+.dist/
+
+# Ambiente
+.env
+.env.local
+.env.*.local
+
+# Build
+*.tgz
+*.tar.gz
+
+# SO
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.suo
+*.swp

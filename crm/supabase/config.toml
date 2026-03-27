@@ -1,0 +1,16 @@
+[api]
+enabled = true
+port = 54321
+
+[db]
+port = 54322
+
+[studio]
+enabled = true
+port = 54323
+
+[functions.webhook-lead]
+verify_jwt = false
+
+[functions.webhook-whatsapp]
+verify_jwt = false
