@@ -37,6 +37,7 @@ serve(async (req) => {
     const { 
       nome_completo, nome,
       telefone_whatsapp, telefone,
+      email,
       canal_origem, origem 
     } = body;
 
@@ -67,6 +68,7 @@ serve(async (req) => {
       leadId = existing.id;
       await supabase.from('leads').update({
         name:   nome_completo || existing.name,
+        email:  email || undefined,
         source: canal_origem || 'landing_page',
       }).eq('id', leadId);
 
@@ -78,6 +80,7 @@ serve(async (req) => {
         .insert({
           name:     finalName,
           phone,
+          email,
           source:   finalSource,
           stage_id: STAGES.NOVO_LEAD,
         })
