@@ -100,6 +100,7 @@ SELECT
   l.source,
   l.score,
   l.notes,
+  l.stage_id,
   l.created_at,
   l.updated_at,
   ps.name AS stage_name,

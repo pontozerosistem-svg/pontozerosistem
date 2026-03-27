@@ -252,7 +252,7 @@ async function processMessage(jid: string, userText: string) {
 
     await supabase.from('agent_state').insert({
       lead_id:    newLead!.id,
-      spin_phase: 'recepcao',
+      spin_phase: 'agendamento',
       spin_data:  {},
       follow_up_count: 0
     });
@@ -262,7 +262,7 @@ async function processMessage(jid: string, userText: string) {
     lead = {
       ...newLead,
       stage_id:    STAGES.NOVO_LEAD,
-      agent_state: [{ spin_phase: 'recepcao', spin_data: {}, follow_up_count: 0 }],
+      agent_state: [{ spin_phase: 'agendamento', spin_data: {}, follow_up_count: 0 }],
     };
 
     console.log(`[whatsapp] Novo lead criado via WhatsApp direto: ${jid}`);

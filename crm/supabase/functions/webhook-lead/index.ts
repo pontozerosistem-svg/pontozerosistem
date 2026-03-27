@@ -98,7 +98,7 @@ serve(async (req) => {
       // Cria estado do agente para este lead
       await supabase.from('agent_state').insert({
         lead_id:    leadId,
-        spin_phase: 'situacao',
+        spin_phase: 'agendamento',
         spin_data:  {},
       });
 
@@ -122,20 +122,30 @@ serve(async (req) => {
 // ── Primeira mensagem do agente ──────────────────────────────
 async function triggerFirstMessage(leadId: string, phone: string, name?: string) {
   const firstName = name?.split(' ')[0] || '';
-  const saudacao  = firstName ? `Oi ${firstName}! 👋` : 'Olá! 👋';
+  const saudacao  = firstName ? `Oi ${firstName},` : 'Oi,';
 
-  const msg =
-    `${saudacao} Vi que você se interessou pela *Ponto Zero — Consultoria de Posicionamento de Imagem*. Fico feliz que chegou até aqui!\n\n` +
-    `Antes de te explicar como funciona, quero entender melhor o seu momento.\n\n` +
-    `Me conta: *hoje, você sente que a sua imagem pessoal e profissional transmite a autoridade que você deseja?*`;
+  const msg1 = `${saudacao} eu sou a Luiza aqui da Ponto Zero e vou dar sequência ao seu atendimento.`;
+  const msg2 = `Aqui nós acreditamos muito que a forma que você se posiciona é crucial para o cliente te perceber como autoridade, mas também para você se sentir bem e saber que o que você mostra está coerente com sua essência, seus valores e suas capacidades.`;
+  const msg3 = `Como cada pessoa é um mundo inteiro, nosso processo é altamente particular e personalizado.\n\nPor isso, a melhor forma de prosseguirmos é com uma sessão de diagnóstico com nosso consultor responsável. Essa reunião não tem custo e o objetivo é entender sua demanda para fazer uma proposta totalmente coerente com seu momento e ambições.\n\nPodemos agendar a sua?`;
 
-  await saveMessage(leadId, 'assistant', msg);
+  const fullText = `${msg1}\n\n${msg2}\n\n${msg3}`;
+  await saveMessage(leadId, 'assistant', fullText);
   
-  // Envia e pega o JID real (pode ser um @lid ou @s.whatsapp.net)
-  const officialJid = await sendWhatsApp(phone, msg);
+  // Envia no Zap separadamente com pequeno atraso para humanizar
+  let officialJid = null;
+  
+  const jid1 = await sendWhatsApp(phone, msg1);
+  if (jid1) officialJid = jid1;
+  await new Promise(r => setTimeout(r, 1200));
+  
+  const jid2 = await sendWhatsApp(phone, msg2);
+  if (jid2) officialJid = jid2;
+  await new Promise(r => setTimeout(r, 1500));
+  
+  const jid3 = await sendWhatsApp(phone, msg3);
+  if (jid3) officialJid = jid3;
 
-  // Atualiza estado do agente: já conta como 1 mensagem enviada
-  // E atualiza o "phone" para o JID real se for diferente, para garantir o match no webhook
+  // Atualiza estado do agente
   const updates: any = { 
     last_message_at: new Date().toISOString(),
     follow_up_count: 1
