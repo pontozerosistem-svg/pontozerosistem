@@ -60,52 +60,59 @@ export default function WhatsAppSetup() {
     
     try {
       // 1. Verifica se já está conectado
+      let currentStep = 'Verificando status inicial';
       const isConnected = await checkStatus();
       if (isConnected) return;
 
-      // 2. Tentar criar instância (falha silenciosamente se já existir)
+      // 2. Tentar criar instância
+      currentStep = 'Criar instância na Evolution';
       try {
         await apiCall('/instance/create', 'POST', {
           instanceName,
           qrcode: true,
-          integration: "WHATSAPP-BAILEYS"
+          token: "", // Opcional, mas algumas versões pedem
         });
       } catch (e: any) {
-        console.log("Instância pode já existir:", e.message);
+        console.log("Instância pode já existir ou erro leve: ", e.message);
       }
 
       // 3. Configurar Webhook
+      currentStep = 'Configurando Webhook';
       await apiCall(`/webhook/set/${instanceName}`, 'POST', {
-        url: SUPABASE_WEBHOOK_URL,
-        webhookBase64: false,
-        events: ["MESSAGES_UPSERT"]
+        webhook: {
+          url: SUPABASE_WEBHOOK_URL,
+          webhookByEvents: false,
+          webhookBase64: false,
+          events: ["MESSAGES_UPSERT"]
+        }
       });
 
-      // 4. Configurar Settings (readMessages, rejectCall)
+      // 4. Configurar Settings
+      currentStep = 'Configurando comportamentos (Settings)';
       await apiCall(`/settings/set/${instanceName}`, 'POST', {
         rejectCall: true,
         msgCall: "No momento não recebemos ligações por aqui. Por favor, envie uma mensagem de texto ou áudio.",
         groupsIgnore: true,
         alwaysOnline: true,
         readMessages: true,
-        readStatus: false
       });
 
       // 5. Buscar QR Code
+      currentStep = 'Buscando QR Code de Conexão';
       const qrData = await apiCall(`/instance/connect/${instanceName}`);
       
       if (qrData?.base64) {
         setQrCode(qrData.base64);
         setStatus('qr');
       } else {
-        // Se a instância acabou de ser criada, pode demorar alguns segundos para gerar o base64
-        setErrorMessage('Aguardando geração do QR Code... clique em Conectar novamente em instantes.');
+        setErrorMessage('QR Code não retornou da Evolution. Clique em Conectar novamente.');
         setStatus('error');
       }
 
     } catch (err: any) {
+      console.error(err);
       setStatus('error');
-      setErrorMessage(err.message || 'Erro ao comunicar com a Evolution API');
+      setErrorMessage(`Erro em [${currentStep}]: ${err.message}`);
     }
   };
 
