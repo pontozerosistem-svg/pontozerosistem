@@ -316,7 +316,7 @@ async function processMessage(jid: string, userText: string) {
     await generateAgentReply(history ?? [], agentInput, lead);
 
   // ── Injeta link de agendamento se agente propôs reunião ─
-  const BOOKING_URL = Deno.env.get('GOOGLE_CALENDAR_BOOKING_URL') || 'https://cal.google.com/u/0/r';
+  const BOOKING_URL = Deno.env.get('GOOGLE_CALENDAR_BOOKING_URL') || 'https://calendar.app.google/SG2KftSo31iS7DJy5';
   const hasBookingTag = rawReply.includes('[ENVIAR_LINK_AGENDAMENTO]');
   const reply = rawReply.replace(
     '[ENVIAR_LINK_AGENDAMENTO]',
