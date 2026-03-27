@@ -52,7 +52,12 @@ serve(async (req) => {
     }
 
     // Limpa o telefone (só números)
-    const phone = String(finalPhone).replace(/\D/g, '');
+    let phone = String(finalPhone).replace(/\D/g, '');
+    
+    // Se for um número brasileiro digitado sem o 55 (10 ou 11 dígitos), adiciona automaticamente
+    if (phone.length === 10 || phone.length === 11) {
+      phone = '55' + phone;
+    }
 
     // ── Verifica se lead já existe ──────────────────────────
     const { data: existing } = await supabase
