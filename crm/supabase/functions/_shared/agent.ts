@@ -223,9 +223,13 @@ export async function generateAgentReply(
     const nextStage = (parsed.next_stage as number | null) ?? null;
     const notes     = String(parsed.notes ?? '');
     
-    let finalReply = String(parsed.reply ?? '').trim();
+    // OpenAI sometimes hallucinates the key name instead of "reply"
+    const rawReplyValue = parsed.reply || parsed.resposta || parsed.mensagem || parsed.message || parsed.response || '';
+    let finalReply = String(rawReplyValue).trim();
+    
+    // Se a IA devolver completamente vazio por algum outro erro, responde humano
     if (!finalReply) {
-      finalReply = 'Perfeito! Fico feliz com a sua decisão. Escolha o melhor horário na agenda do Peu por aqui: [ENVIAR_LINK_AGENDAMENTO]';
+      finalReply = 'Deu um pequeno erro de comunicação aqui no meu sistema, mas já estou de volta! Pode me confirmar onde tínhamos parado?';
     }
 
     return {
