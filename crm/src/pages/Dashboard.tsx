@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { RefreshCw, Search, Zap, LayoutDashboard, Columns, Plus, Settings } from 'lucide-react'
+import { RefreshCw, Search, Zap, LayoutDashboard, Columns, Plus, Settings, CalendarDays } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import type { Lead, PipelineStage } from '../lib/supabase'
@@ -8,6 +8,7 @@ import KanbanBoard from '../components/KanbanBoard'
 import LeadModal from '../components/LeadModal'
 import MetricsView from '../components/MetricsView'
 import SettingsView from '../components/SettingsView'
+import MeetingsView from '../components/MeetingsView'
 
 const STAGES_COLORS: Record<number, string> = {
   1: '#94a3b8', 2: '#3b82f6', 3: '#f59e0b', 4: '#8b5cf6',
@@ -16,7 +17,7 @@ const STAGES_COLORS: Record<number, string> = {
 
 export default function Dashboard() {
   const navigate = useNavigate()
-  const [activeTab, setActiveTab] = useState<'metrics' | 'pipeline' | 'settings'>('metrics')
+  const [activeTab, setActiveTab] = useState<'metrics' | 'pipeline' | 'meetings' | 'settings'>('metrics')
   const [leads, setLeads] = useState<Lead[]>([])
   const [stages, setStages] = useState<PipelineStage[]>([])
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null)
@@ -113,6 +114,13 @@ export default function Dashboard() {
               Pipeline
             </button>
             <button 
+              className={`tab-item ${activeTab === 'meetings' ? 'active' : ''}`}
+              onClick={() => setActiveTab('meetings')}
+            >
+              <CalendarDays size={16} />
+              Reuniões
+            </button>
+            <button 
               className={`tab-item ${activeTab === 'settings' ? 'active' : ''}`}
               onClick={() => setActiveTab('settings')}
             >
@@ -123,7 +131,7 @@ export default function Dashboard() {
         </div>
 
         <div className="topbar-right">
-          {activeTab !== 'settings' && (
+          {activeTab !== 'settings' && activeTab !== 'meetings' && (
             <div className="search-wrap" style={{ marginRight: '16px' }}>
               <Search size={14} className="search-icon" />
               <input
@@ -137,7 +145,7 @@ export default function Dashboard() {
           )}
           <button 
             className="btn btn-primary" 
-            style={{ marginRight: '12px' }}
+            style={{ marginRight: '12px', display: activeTab === 'settings' || activeTab === 'meetings' ? 'none' : 'flex' }}
             onClick={() => setSelectedLead({ id: '', phone: '', stage_id: 1, score: 0, created_at: new Date().toISOString(), updated_at: new Date().toISOString() } as Lead)}
           >
             <Plus size={16} />
@@ -181,6 +189,11 @@ export default function Dashboard() {
                     onStageChange={handleStageChange}
                   />
                 </div>
+              </div>
+            )}
+            {activeTab === 'meetings' && (
+              <div className="animate-fade">
+                <MeetingsView />
               </div>
             )}
             {activeTab === 'settings' && (

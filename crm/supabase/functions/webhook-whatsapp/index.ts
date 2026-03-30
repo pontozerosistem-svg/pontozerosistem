@@ -246,7 +246,7 @@ async function processMessage(jid: string, userText: string) {
       .insert({
         phone:    jid,
         source:   'whatsapp_inbound',
-        stage_id: STAGES.NOVO_LEAD,
+        stage_id: STAGES.PRIMEIRO_CONTATO,
       })
       .select('id')
       .single();
@@ -258,11 +258,11 @@ async function processMessage(jid: string, userText: string) {
       follow_up_count: 0
     });
 
-    await logActivity(newLead!.id, 'stage_change', 'Lead criado via WhatsApp direto', null, STAGES.NOVO_LEAD);
+    await logActivity(newLead!.id, 'stage_change', 'Lead criado via WhatsApp direto', null, STAGES.PRIMEIRO_CONTATO);
 
     lead = {
       ...newLead,
-      stage_id:    STAGES.NOVO_LEAD,
+      stage_id:    STAGES.PRIMEIRO_CONTATO,
       agent_state: [{ spin_phase: 'agendamento', spin_data: {}, follow_up_count: 0 }],
     };
 
@@ -270,7 +270,7 @@ async function processMessage(jid: string, userText: string) {
   }
 
   const leadId     = lead.id;
-  const oldStage   = lead.stage_id ?? STAGES.NOVO_LEAD;
+  const oldStage   = lead.stage_id ?? STAGES.PRIMEIRO_CONTATO;
   const agentState = lead.agent_state?.[0] ?? {
     spin_phase: 'situacao',
     spin_data: {},
@@ -349,15 +349,26 @@ async function processMessage(jid: string, userText: string) {
   let reply = rawReply;
   if (schedule && schedule.action === 'book' && schedule.time) {
       // Se a IA decidiu agendar um horário
-      const parsedDate = new Date(schedule.time + ":00-03:00"); // Puxando do offset BR
+      const parsedDate = new Date(schedule.time + ":00-03:00"); // Offset BR
+
+      // Gera link Jitsi único (sem API key)
+      const meetingId  = crypto.randomUUID();
+      const meetSlug   = `PontoZero-${meetingId.replace(/-/g, '').substring(0, 10).toUpperCase()}`;
+      const meetLink   = `https://meet.jit.si/${meetSlug}`;
+
       await supabase.from('meetings').insert({
+        id: meetingId,
         lead_id: leadId,
         scheduled_start: parsedDate.toISOString(),
-        status: 'scheduled'
+        meet_link: meetLink,
+        status: 'scheduled',
       });
-      console.log(`[calendar] Agendamento confirmado e inserido para lead ${leadId} em ${parsedDate.toISOString()}`);
-      
-      reply = rawReply.replace('[ENVIAR_LINK_AGENDAMENTO]', ''); // Remove possível tag suja
+
+      console.log(`[calendar] Agendamento confirmado para lead ${leadId} em ${parsedDate.toISOString()} | Link: ${meetLink}`);
+
+      // Remove tag suja e acrescenta o link na resposta
+      reply = rawReply.replace('[ENVIAR_LINK_AGENDAMENTO]', '') +
+        `\n\n🔗 *Link da videochamada (Jitsi):*\n${meetLink}\n\nSalve esse link — ele será o mesmo que usaremos na reunião. Até lá! 😊`;
   } else {
     // Fallback: Injeta link de agendamento se agente usou a tag genérica ao longo do papo
     const BOOKING_URL = Deno.env.get('GOOGLE_CALENDAR_BOOKING_URL') || 'https://calendar.app.google/SG2KftSo31iS7DJy5';
