@@ -87,7 +87,7 @@ serve(async (req) => {
           phone,
           email,
           source:   finalSource,
-          stage_id: STAGES.NOVO_LEAD,
+          stage_id: STAGES.PRIMEIRO_CONTATO,
         })
         .select('id')
         .single();
@@ -103,7 +103,7 @@ serve(async (req) => {
       });
 
       // Loga criação no histórico de atividades
-      await logActivity(leadId, 'stage_change', `Lead criado via "${finalSource}"`, null, STAGES.NOVO_LEAD);
+      await logActivity(leadId, 'stage_change', `Lead criado via "${finalSource}"`, null, STAGES.PRIMEIRO_CONTATO);
 
       console.log(`[webhook-lead] Novo lead criado: ${leadId} | ${phone}`);
 
