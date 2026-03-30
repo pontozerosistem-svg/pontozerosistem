@@ -58,9 +58,9 @@ export default function WhatsAppSetup() {
     setStatus('loading');
     setErrorMessage('');
     
+    let currentStep = 'Verificando status inicial';
     try {
       // 1. Verifica se já está conectado
-      let currentStep = 'Verificando status inicial';
       const isConnected = await checkStatus();
       if (isConnected) return;
 
