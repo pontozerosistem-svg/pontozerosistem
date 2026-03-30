@@ -36,6 +36,7 @@ export interface Lead {
   last_message_at?: string;
   follow_up_count?: number;
   message_count?: number;
+  is_active?: boolean;
 }
 
 export interface Conversation {

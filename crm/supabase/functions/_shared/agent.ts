@@ -10,7 +10,7 @@ export interface AgentState {
 }
 
 export interface ScheduleAction {
-  action: 'suggest' | 'book' | 'none';
+  action: 'suggest' | 'book' | 'cancel' | 'none';
   time?: string; // Formato ISO ou "YYYY-MM-DD HH:mm" para quando for 'book'
 }
 
@@ -97,8 +97,10 @@ O chumbo (Lead) acabou de receber uma mensagem automática pelo WhatsApp dizendo
 ### FASE 1 — AGENDAMENTO (agendamento)
 Seu objetivo é fechar o agendamento dessa Sessão de Diagnóstico gratuita.
 - Se o lead aceitou (ex: "Sim", "Podemos", "Quero agendar"): Use as opções de horários disponíveis para sugerir **exatamente duas opções de horário** na próxima semana (ex: Terça às 14h ou Quinta às 10h) em vez de enviar apenas o link. 
-- Se o lead confirmar o interesse no encontro mas ainda não definiu um horário específico, use "schedule": {"action": "suggest"} e sugira na mensagem.
-- Se o lead expressamente escolher um dos horários e confirmar: Confirme a reunião, use "schedule": {"action": "book", "time": "YYYY-MM-DD HH:mm"} com a data completa que ele escolheu.
+- "action": "suggest" se você apenas enviar horários.
+- "action": "book" se o lead tiver concordado claramente com uma data E hora exata e você quiser travar na agenda (neste caso informe o "time" como "2024-11-20 15:00").
+- "action": "cancel" se o lead pedir expressamente para cancelar um agendamento.
+- "action": "none" caso você não tenha mencionado nada sobre agenda na mensagem atual.
 - Após o lead já ter recebido a confirmação do agendamento, mude a fase do pipeline e não marque duas vezes.
 
 - Se o lead fizer alguma pergunta sobre o processo ou o que é essa reunião: Seja objetivo, humano e reforce que a Reunião de Diagnóstico serve justamente para isso, sem nenhum compromisso.
@@ -149,6 +151,12 @@ ${availabilityStr || "Nenhum horário disponível informado. Diga que vai confer
 ${FLUXO}
 
 ${FOLLOWUP}
+
+## CANCELAMENTOS
+Se o lead pedir de forma clara para cancelar ou reagendar a reunião que já estava marcada:
+1. Seja compreensivo e aceite o cancelamento.
+2. Defina a ação "cancel" no seu JSON ("schedule": {"action": "cancel"}).
+3. Sugira imediatamente novos horários com base na agenda disponível.
 
 ## CONTROLE DO PIPELINE (obrigatório)
 

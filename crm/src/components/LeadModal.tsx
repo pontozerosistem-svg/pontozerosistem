@@ -16,10 +16,11 @@ export default function LeadModal({ lead, stages, onClose, onUpdate, onDelete }:
   const [conversations, setConversations] = useState<Conversation[]>([])
   const [editing, setEditing] = useState(isNew)
   const [form, setForm] = useState({ 
-    name: lead.name || '', 
+    name: lead.name || '',
     phone: lead.phone || '',
     notes: lead.notes || '', 
-    stage_id: lead.stage_id 
+    stage_id: lead.stage_id,
+    is_active: lead.is_active ?? true
   })
   const [saving, setSaving] = useState(false)
   const [tab, setTab] = useState<'info' | 'chat'>('info')
@@ -49,6 +50,11 @@ export default function LeadModal({ lead, stages, onClose, onUpdate, onDelete }:
         .insert({ name: form.name, phone: form.phone, notes: form.notes, stage_id: form.stage_id })
         .select('*, agent_state(*)')
         .single()
+        
+      if (!res.error && res.data) {
+        // As a new lead is created, webhook or manually we set agent_state. We need to update is_active.
+        await supabase.from('agent_state').update({ is_active: form.is_active }).eq('lead_id', res.data.id)
+      }
     } else {
       res = await supabase
         .from('leads')
@@ -56,13 +62,17 @@ export default function LeadModal({ lead, stages, onClose, onUpdate, onDelete }:
         .eq('id', lead.id)
         .select('*, agent_state(*)')
         .single()
+        
+      if (!res.error) {
+         await supabase.from('agent_state').update({ is_active: form.is_active }).eq('lead_id', lead.id)
+      }
     }
     
     setSaving(false)
     if (res.error) {
       alert('Erro ao salvar lead: ' + res.error.message)
     } else if (res.data) {
-      onUpdate({ ...lead, ...res.data })
+      onUpdate({ ...lead, ...res.data, is_active: form.is_active })
       setEditing(false)
       if (isNew) onClose()
     }
@@ -181,6 +191,34 @@ export default function LeadModal({ lead, stages, onClose, onUpdate, onDelete }:
                     ))}
                   </select>
                   <ChevronDown size={14} className="select-icon" />
+                </div>
+              </div>
+
+              {/* Bot Toggle */}
+              <div className="field-group">
+                <label>Assistente Virtual (IA)</label>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 4 }}>
+                  <div
+                    onClick={() => editing && setForm(f => ({ ...f, is_active: !f.is_active }))}
+                    style={{
+                      width: 40, height: 22, borderRadius: 12, 
+                      background: form.is_active ? 'var(--accent)' : 'var(--border)',
+                      position: 'relative', transition: 'background 0.2s', 
+                      cursor: editing ? 'pointer' : 'default',
+                      opacity: editing ? 1 : 0.7
+                    }}
+                  >
+                    <div style={{
+                      width: 16, height: 16, borderRadius: '50%', background: 'white',
+                      position: 'absolute', top: 3,
+                      left: form.is_active ? 21 : 3,
+                      transition: 'left 0.2s',
+                      boxShadow: '0 1px 4px rgba(0,0,0,0.3)',
+                    }} />
+                  </div>
+                  <span style={{ fontSize: 13, color: form.is_active ? 'var(--text-primary)' : 'var(--text-muted)' }}>
+                    {form.is_active ? 'Ativo (Respondendo Automático)' : 'Pausado (Apenas Humano)'}
+                  </span>
                 </div>
               </div>
 

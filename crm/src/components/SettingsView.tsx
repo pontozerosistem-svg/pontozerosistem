@@ -14,7 +14,8 @@ const DAYS = [
 
 interface Slot {
   id?: string
-  day_of_week: number
+  day_of_week?: number | null
+  specific_date?: string | null
   start_time: string
   end_time: string
 }
@@ -46,15 +47,19 @@ export default function SettingsView() {
     setLoading(false)
   }
 
-  function addSlot(dayId: number) {
-    setSlots(prev => [...prev, { day_of_week: dayId, start_time: '09:00', end_time: '18:00' }])
+  function addSlot(dayId?: number, isSpecificDate = false) {
+    if (isSpecificDate) {
+      setSlots(prev => [...prev, { specific_date: new Date().toISOString().split('T')[0], start_time: '09:00', end_time: '18:00' }])
+    } else {
+      setSlots(prev => [...prev, { day_of_week: dayId, start_time: '09:00', end_time: '18:00' }])
+    }
   }
 
   function removeSlot(index: number) {
     setSlots(prev => prev.filter((_, i) => i !== index))
   }
 
-  function updateSlot(index: number, field: 'start_time' | 'end_time', value: string) {
+  function updateSlot(index: number, field: keyof Slot, value: any) {
     setSlots(prev => prev.map((s, i) => i === index ? { ...s, [field]: value } : s))
   }
 
@@ -72,7 +77,8 @@ export default function SettingsView() {
 
       if (slots.length > 0) {
         const toInsert = slots.map(s => ({
-          day_of_week: s.day_of_week,
+          day_of_week: s.day_of_week ?? null,
+          specific_date: s.specific_date ?? null,
           start_time: s.start_time,
           end_time: s.end_time,
         }))
@@ -207,6 +213,72 @@ export default function SettingsView() {
             </div>
           )
         })}
+      </div>
+
+      {/* Specific Dates */}
+      <div className="card glass" style={{ padding: 24, marginBottom: 20 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+          <h3 style={{ fontSize: 17, fontWeight: 600 }}>🌟 Datas Específicas / Exceções</h3>
+          <button
+            className="btn btn-ghost"
+            style={{ fontSize: 12, padding: '4px 10px', display: 'flex', alignItems: 'center', gap: 4 }}
+            onClick={() => addSlot(undefined, true)}
+          >
+            <Plus size={13} /> Adicionar data
+          </button>
+        </div>
+        <p style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 20 }}>
+          Defina horários para uma data específica (exibe prioritariamente sobre a regra semanal).
+        </p>
+
+        {slots.map((s, idx) => ({ ...s, _idx: idx })).filter(s => s.specific_date).length === 0 ? (
+          <p style={{ fontSize: 12, color: 'var(--text-muted)', paddingLeft: 4 }}>Nenhuma data específica cadastrada.</p>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {slots.map((slot, idx) => {
+              if (!slot.specific_date) return null
+              return (
+                <div
+                  key={idx}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 10,
+                    background: 'var(--bg-elevated)', borderRadius: 8, padding: '10px 14px',
+                  }}
+                >
+                  <input
+                    type="date"
+                    className="input"
+                    value={slot.specific_date}
+                    onChange={e => updateSlot(idx, 'specific_date', e.target.value)}
+                    style={{ width: 140 }}
+                  />
+                  <input
+                    type="time"
+                    className="input"
+                    value={slot.start_time.substring(0, 5)}
+                    onChange={e => updateSlot(idx, 'start_time', e.target.value)}
+                    style={{ width: 120 }}
+                  />
+                  <span style={{ color: 'var(--text-muted)', fontSize: 13 }}>até</span>
+                  <input
+                    type="time"
+                    className="input"
+                    value={slot.end_time.substring(0, 5)}
+                    onChange={e => updateSlot(idx, 'end_time', e.target.value)}
+                    style={{ width: 120 }}
+                  />
+                  <button
+                    className="btn btn-ghost"
+                    style={{ color: '#ef4444', padding: '4px 8px' }}
+                    onClick={() => removeSlot(idx)}
+                  >
+                    <Trash2 size={15} />
+                  </button>
+                </div>
+              )
+            })}
+          </div>
+        )}
       </div>
 
       <div style={{ display: 'flex', justifyContent: 'flex-end' }}>

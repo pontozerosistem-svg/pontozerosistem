@@ -275,6 +275,7 @@ async function processMessage(jid: string, userText: string) {
     spin_phase: 'situacao',
     spin_data: {},
     follow_up_count: 0,
+    is_active: true,
   };
 
   console.log(`[whatsapp] Lead ID: ${leadId}, Phase: ${agentState.spin_phase}, Count: ${agentState.follow_up_count}`);
@@ -297,10 +298,10 @@ async function processMessage(jid: string, userText: string) {
   // ── Salva mensagem do usuário ───────────────────────────
   await saveMessage(leadId, 'user', userText);
 
-  // ── Verifica configurações globais do agente ────────────
+  // ── Verifica configurações do agente (Global e por Lead) ────────
   const { data: settings } = await supabase.from('scheduling_settings').select('agent_enabled').maybeSingle();
-  if (settings && settings.agent_enabled === false) {
-    console.log(`[whatsapp] Agente desabilitado nas configurações. Ignorando resposta para ${jid}.`);
+  if ((settings && settings.agent_enabled === false) || agentState.is_active === false) {
+    console.log(`[whatsapp] Agente desabilitado (Global: ${settings?.agent_enabled}, Lead: ${agentState.is_active}). Ignorando resposta para ${jid}.`);
     return new Response('ok', { status: 200 });
   }
 
@@ -311,14 +312,24 @@ async function processMessage(jid: string, userText: string) {
     const daysMap = ['Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado'];
     const nowLocal = new Date(new Date().toLocaleString("en-US", { timeZone: "America/Sao_Paulo" }));
     
-    // Lista os próximos 7 dias úteis
-    for (let i = 1; i <= 7; i++) {
+    // Lista os próximos 14 dias para dar opções ao lead
+    for (let i = 1; i <= 14; i++) {
         const d = new Date(nowLocal);
         d.setDate(d.getDate() + i);
+        
         const dayOfWeek = d.getDay();
-        const availableSlots = availability.filter(a => a.day_of_week === dayOfWeek);
+        const dateISO = d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, '0') + "-" + String(d.getDate()).padStart(2, '0');
+        const dateStr = d.toLocaleDateString('pt-BR', { timeZone: "America/Sao_Paulo" });
+
+        // Procura slots fixos dessa data específica primeiro
+        let availableSlots = availability.filter((a: any) => a.specific_date === dateISO);
+        
+        // Se não tiver data específica, pega regra semanal
+        if (availableSlots.length === 0) {
+            availableSlots = availability.filter((a: any) => a.day_of_week === dayOfWeek && !a.specific_date);
+        }
+
         if (availableSlots.length > 0) {
-            const dateStr = d.toLocaleDateString('pt-BR', { timeZone: "America/Sao_Paulo" });
             for (const slot of availableSlots) {
                 availabilityStr += `${daysMap[dayOfWeek]} (${dateStr}) das ${slot.start_time.substring(0, 5)} às ${slot.end_time.substring(0, 5)}\n`;
             }
@@ -366,9 +377,42 @@ async function processMessage(jid: string, userText: string) {
 
       console.log(`[calendar] Agendamento confirmado para lead ${leadId} em ${parsedDate.toISOString()} | Link: ${meetLink}`);
 
-      // Remove tag suja e acrescenta o link na resposta
-      reply = rawReply.replace('[ENVIAR_LINK_AGENDAMENTO]', '') +
-        `\n\n🔗 *Link da videochamada (Jitsi):*\n${meetLink}\n\nSalve esse link — ele será o mesmo que usaremos na reunião. Até lá! 😊`;
+      // Trunca a mensagem do LLM se houver [REUNIÃO_AGENDADA_AQUI] e substitui
+      if (reply.includes('[REUNIÃO_AGENDADA_AQUI]')) {
+         reply = reply.replace('[REUNIÃO_AGENDADA_AQUI]', `\nLink da Reunião: ${meetLink}\n`);
+      }
+
+      // ── Notifica o consultor imediatamente sobre o novo agendamento
+      console.log(`[calendar] Verificando consultant_phone para notificação: ${settings?.consultant_phone}`);
+      if (settings?.consultant_phone) {
+        try {
+          const leadName = lead.name || jid.split('@')[0];
+          const localDate = parsedDate.toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' });
+          const consultMsg = `🔔 *Nova Reunião Agendada!*\n\nO lead *${leadName}* acabou de confirmar uma reunião com a IA.\n\n📅 *Data:* ${localDate}\n🔗 *Link Jitsi:* ${meetLink}\n\nEntre no link no horário marcado!`;
+          await sendWhatsApp(settings.consultant_phone, consultMsg);
+          console.log(`[calendar] Notificação enviada ao consultor ${settings.consultant_phone} sobre o agendamento do lead ${leadId}`);
+        } catch (e) {
+          console.error(`[calendar] Erro ao notificar consultor sobre a reunião do lead ${leadId}:`, e);
+        }
+      }
+
+  } else if (schedule && schedule.action === 'cancel') {
+     console.log(`[calendar] Lead ${leadId} solicitou cancelamento da reunião.`);
+     // Vamos procurar reuniões agendadas pendentes
+     const { data: activeMeetings } = await supabase.from('meetings').select('*').eq('lead_id', leadId).eq('status', 'scheduled');
+     if (activeMeetings && activeMeetings.length > 0) {
+        // Marca como cancelled
+        await supabase.from('meetings').update({ status: 'cancelled' }).in('id', activeMeetings.map(m => m.id));
+        console.log(`[calendar] Canceladas ${activeMeetings.length} reuniões do lead ${leadId}`);
+        // Também vamos notificar o consultor se for possível
+        if (settings?.consultant_phone) {
+           try {
+             const leadName = lead.name || jid.split('@')[0];
+             const consultCancelMsg = `⚠️ *Reunião Cancelada!*\nO lead *${leadName}* acabou de desmarcar a reunião via IA.`;
+             await sendWhatsApp(settings.consultant_phone, consultCancelMsg);
+           } catch (e) {}
+        }
+     }
   } else {
     // Fallback: Injeta link de agendamento se agente usou a tag genérica ao longo do papo
     const BOOKING_URL = Deno.env.get('GOOGLE_CALENDAR_BOOKING_URL') || 'https://calendar.app.google/SG2KftSo31iS7DJy5';
