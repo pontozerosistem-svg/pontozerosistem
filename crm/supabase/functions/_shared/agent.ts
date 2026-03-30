@@ -9,6 +9,11 @@ export interface AgentState {
   spin_data: Record<string, unknown>; // mantido por compatibilidade
 }
 
+export interface ScheduleAction {
+  action: 'suggest' | 'book' | 'none';
+  time?: string; // Formato ISO ou "YYYY-MM-DD HH:mm" para quando for 'book'
+}
+
 export interface Lead {
   id: string;
   name?: string;
@@ -25,6 +30,7 @@ export interface AgentResult {
   score: number;
   nextStage: number | null;
   notes: string;
+  schedule?: ScheduleAction;
 }
 
 // ── Persona ──────────────────────────────────────────────────
@@ -90,16 +96,20 @@ O chumbo (Lead) acabou de receber uma mensagem automática pelo WhatsApp dizendo
 
 ### FASE 1 — AGENDAMENTO (agendamento)
 Seu objetivo é fechar o agendamento dessa Sessão de Diagnóstico gratuita.
-- Se o lead aceitou (ex: "Sim", "Podemos", "Quero agendar"): Diga algo com entusiasmo e envie o link para ele escolher o horário.
-Exemplo: "Perfeito! Fico feliz com a sua decisão. Escolha o melhor horário na agenda do Peu por aqui: [ENVIAR_LINK_AGENDAMENTO]"
+- Se o lead aceitou (ex: "Sim", "Podemos", "Quero agendar"): Use as opções de horários disponíveis para sugerir **exatamente duas opções de horário** na próxima semana (ex: Terça às 14h ou Quinta às 10h) em vez de enviar apenas o link. 
+- Se o lead confirmar o interesse no encontro mas ainda não definiu um horário específico, use "schedule": {"action": "suggest"} e sugira na mensagem.
+- Se o lead expressamente escolher um dos horários e confirmar: Confirme a reunião, use "schedule": {"action": "book", "time": "YYYY-MM-DD HH:mm"} com a data completa que ele escolheu.
+- Após o lead já ter recebido a confirmação do agendamento, mude a fase do pipeline e não marque duas vezes.
 
 - Se o lead fizer alguma pergunta sobre o processo ou o que é essa reunião: Seja objetivo, humano e reforce que a Reunião de Diagnóstico serve justamente para isso, sem nenhum compromisso.
 
 > [!IMPORTANT]
-> Quando o lead aceitar o agendamento, coloque DE FORMA EXATA a tag literal **[ENVIAR_LINK_AGENDAMENTO]** ao final da sua mensagem.
+> Quando confirmar a reunião com o horário escolhido, responda com entusiasmo e não envie mais o link manual do google calendar, pois o sistema agendará automaticamente.
+> Caso nenhuma das duas opções sirva, o lead pode pedir para ver outros horários, oferte outras 2 opções.
 
 ### FASE 2 — CONFIRMADO (confirmado)
-Após o lead já ter recebido o link de agendamento em mensagens anteriores, se ele mandar mais alguma dúvida, responda de forma prestativa, mas não mande o link novamente a menos que ele peça.
+Nesta fase, o lead já possui uma reunião agendada.
+Se ele mandar mais alguma dúvida, responda de forma prestativa e objetiva. Lembre-se que o lead deve ser devidamente relembrado da reunião, e caso seja necessário desmarcar ou reagendar, avise que tentaremos em breve.
 `;
 
 // ── Follow-up ─────────────────────────────────────────────────
@@ -113,7 +123,7 @@ Se o lead não responder:
 `;
 
 // ── Build System Prompt ──────────────────────────────────────
-function buildSystemPrompt(state: AgentState, lead: Lead): string {
+function buildSystemPrompt(state: AgentState, lead: Lead, availabilityStr: string, currentDate: string): string {
   const nomeInfo = lead.name
     ? `Nome do lead: ${lead.name}`
     : `Nome do lead: ainda não coletado.`;
@@ -126,11 +136,15 @@ function buildSystemPrompt(state: AgentState, lead: Lead): string {
 
 ${SERVICOS}
 
-## CONTEXTO DO LEAD
+## CONTEXTO DO LEAD E SISTEMA
+Hoje é: ${currentDate}
 ${nomeInfo}
 Fase atual: ${state.phase}
 Mensagens trocadas: ${state.follow_up_count}
 ${resumo}
+
+## HORÁRIOS DISPONÍVEIS DO PROFISSIONAL (USE ESTES PARA SUGERIR)
+${availabilityStr || "Nenhum horário disponível informado. Diga que vai conferir a agenda e retornar depois."}
 
 ${FLUXO}
 
@@ -142,7 +156,7 @@ ${FOLLOWUP}
 |----|-------------------------|-----------------------------------------------|
 | 1  | Primeiro contato        | Inicial                                       |
 | 2  | Agendamento de reunião  | Quando você entrar no assunto de agendamento  |
-| 3  | Reunião agendada        | Quando o lead confirmar que já agendou        |
+| 3  | Reunião agendada        | Quando o lead confirmar que já agendou / marcar |
 | 4  | Envio de proposta       | Quando você enviar ou falar sobre a proposta  |
 | 5  | Ganho                   | Lead confirmou o fechamento/contratação       |
 | 6  | Perdido                 | Lead desistiu ou pediu para não ser contatado |
@@ -153,7 +167,11 @@ ${FOLLOWUP}
   "phase": "agendamento|confirmado",
   "next_stage": 2,
   "score": 0,
-  "notes": "Resumo objetivo sobre as dúvidas ou a intenção do lead."
+  "notes": "Resumo objetivo sobre as dúvidas ou a intenção do lead.",
+  "schedule": {
+    "action": "none" | "suggest" | "book",
+    "time": "YYYY-MM-DD HH:mm ou null"
+  }
 }`;
 }
 
@@ -161,9 +179,14 @@ ${FOLLOWUP}
 export async function generateAgentReply(
   history: { role: string; content: string }[],
   state: AgentState,
-  lead: Lead & { notes?: string }
+  lead: Lead & { notes?: string },
+  availabilityStr: string = ""
 ): Promise<AgentResult> {
-  const systemPrompt = buildSystemPrompt(state, lead);
+  // Use timezone de São Paulo para formatar a data que vai pro agente
+  const now = new Date();
+  const currentDate = new Intl.DateTimeFormat('pt-BR', { dateStyle: 'full', timeStyle: 'short', timeZone: 'America/Sao_Paulo' }).format(now);
+  
+  const systemPrompt = buildSystemPrompt(state, lead, availabilityStr, currentDate);
   console.log(`[agent] Lead ${lead.id} | Phase: ${state.phase} | Msgs: ${state.follow_up_count}`);
 
   // Formata histórico para o OpenAI
@@ -230,6 +253,8 @@ export async function generateAgentReply(
       finalReply = 'Deu um pequeno erro de comunicação aqui no meu sistema, mas já estou de volta! Pode me confirmar onde tínhamos parado?';
     }
 
+    const schedule = parsed.schedule as ScheduleAction | undefined;
+
     return {
       reply:    finalReply,
       newPhase: phase,
@@ -237,6 +262,7 @@ export async function generateAgentReply(
       score,
       nextStage,
       notes,
+      schedule,
     };
   } catch (error: any) {
     console.error('[generateAgentReply] Erro fatal:', error);

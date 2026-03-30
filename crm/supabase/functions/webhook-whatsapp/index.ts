@@ -297,6 +297,35 @@ async function processMessage(jid: string, userText: string) {
   // ── Salva mensagem do usuário ───────────────────────────
   await saveMessage(leadId, 'user', userText);
 
+  // ── Verifica configurações globais do agente ────────────
+  const { data: settings } = await supabase.from('scheduling_settings').select('agent_enabled').maybeSingle();
+  if (settings && settings.agent_enabled === false) {
+    console.log(`[whatsapp] Agente desabilitado nas configurações. Ignorando resposta para ${jid}.`);
+    return new Response('ok', { status: 200 });
+  }
+
+  // ── Busca disponibilidade do profissional ───────────────
+  const { data: availability } = await supabase.from('professional_availability').select('*');
+  let availabilityStr = "";
+  if (availability && availability.length > 0) {
+    const daysMap = ['Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado'];
+    const nowLocal = new Date(new Date().toLocaleString("en-US", { timeZone: "America/Sao_Paulo" }));
+    
+    // Lista os próximos 7 dias úteis
+    for (let i = 1; i <= 7; i++) {
+        const d = new Date(nowLocal);
+        d.setDate(d.getDate() + i);
+        const dayOfWeek = d.getDay();
+        const availableSlots = availability.filter(a => a.day_of_week === dayOfWeek);
+        if (availableSlots.length > 0) {
+            const dateStr = d.toLocaleDateString('pt-BR', { timeZone: "America/Sao_Paulo" });
+            for (const slot of availableSlots) {
+                availabilityStr += `${daysMap[dayOfWeek]} (${dateStr}) das ${slot.start_time.substring(0, 5)} às ${slot.end_time.substring(0, 5)}\n`;
+            }
+        }
+    }
+  }
+
   // ── Busca histórico completo (últimas 40 mensagens) ────────
   const { data: historyRaw } = await supabase
     .from('conversations')
@@ -313,25 +342,40 @@ async function processMessage(jid: string, userText: string) {
     ...agentState,
     phase: agentState.spin_phase, // mapeia para o novo campo
   };
-  const { reply: rawReply, newPhase, spinData, score, nextStage, notes } =
-    await generateAgentReply(history ?? [], agentInput, lead);
+  const { reply: rawReply, newPhase, spinData, score, nextStage, notes, schedule } =
+    await generateAgentReply(history ?? [], agentInput, lead, availabilityStr);
 
-  // ── Injeta link de agendamento se agente propôs reunião ─
-  const BOOKING_URL = Deno.env.get('GOOGLE_CALENDAR_BOOKING_URL') || 'https://calendar.app.google/SG2KftSo31iS7DJy5';
-  const hasBookingTag = rawReply.includes('[ENVIAR_LINK_AGENDAMENTO]');
-  const reply = rawReply.replace(
-    '[ENVIAR_LINK_AGENDAMENTO]',
-    `\n\n📅 *Agende sua Reunião de Descoberta (gratuita):*\n${BOOKING_URL}`
-  );
+  // ── Trata agendamento via JSON ou fallback ───────────────
+  let reply = rawReply;
+  if (schedule && schedule.action === 'book' && schedule.time) {
+      // Se a IA decidiu agendar um horário
+      const parsedDate = new Date(schedule.time + ":00-03:00"); // Puxando do offset BR
+      await supabase.from('meetings').insert({
+        lead_id: leadId,
+        scheduled_start: parsedDate.toISOString(),
+        status: 'scheduled'
+      });
+      console.log(`[calendar] Agendamento confirmado e inserido para lead ${leadId} em ${parsedDate.toISOString()}`);
+      
+      reply = rawReply.replace('[ENVIAR_LINK_AGENDAMENTO]', ''); // Remove possível tag suja
+  } else {
+    // Fallback: Injeta link de agendamento se agente usou a tag genérica ao longo do papo
+    const BOOKING_URL = Deno.env.get('GOOGLE_CALENDAR_BOOKING_URL') || 'https://calendar.app.google/SG2KftSo31iS7DJy5';
+    const hasBookingTag = rawReply.includes('[ENVIAR_LINK_AGENDAMENTO]');
+    reply = rawReply.replace(
+      '[ENVIAR_LINK_AGENDAMENTO]',
+      `\n\n📅 *Agende sua Reunião de Descoberta (gratuita):*\n${BOOKING_URL}`
+    );
 
-  // Se usou a tag, registra na tabela meetings
-  if (hasBookingTag) {
-    await supabase.from('meetings').insert({
-      lead_id: leadId,
-      calendar_booking_url: BOOKING_URL,
-      status: 'proposed',
-    }).select().maybeSingle();
-    console.log(`[calendar] Link de agendamento enviado para lead ${leadId}`);
+    // Se usou a tag, registra na tabela meetings num formato fallback
+    if (hasBookingTag) {
+      await supabase.from('meetings').insert({
+        lead_id: leadId,
+        calendar_booking_url: BOOKING_URL,
+        status: 'proposed',
+      }).select().maybeSingle();
+      console.log(`[calendar] Link manual de agendamento enviado para lead ${leadId}`);
+    }
   }
 
   // ── Salva resposta do agente ────────────────────────────

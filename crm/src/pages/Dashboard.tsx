@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { RefreshCw, Search, Zap, LayoutDashboard, Columns, Plus, Smartphone } from 'lucide-react'
+import { RefreshCw, Search, Zap, LayoutDashboard, Columns, Plus, Settings } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import type { Lead, PipelineStage } from '../lib/supabase'
@@ -7,6 +7,7 @@ import KpiHeader from '../components/KpiHeader'
 import KanbanBoard from '../components/KanbanBoard'
 import LeadModal from '../components/LeadModal'
 import MetricsView from '../components/MetricsView'
+import SettingsView from '../components/SettingsView'
 
 const STAGES_COLORS: Record<number, string> = {
   1: '#94a3b8', 2: '#3b82f6', 3: '#f59e0b', 4: '#8b5cf6',
@@ -15,7 +16,7 @@ const STAGES_COLORS: Record<number, string> = {
 
 export default function Dashboard() {
   const navigate = useNavigate()
-  const [activeTab, setActiveTab] = useState<'metrics' | 'pipeline'>('metrics')
+  const [activeTab, setActiveTab] = useState<'metrics' | 'pipeline' | 'settings'>('metrics')
   const [leads, setLeads] = useState<Lead[]>([])
   const [stages, setStages] = useState<PipelineStage[]>([])
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null)
@@ -111,20 +112,29 @@ export default function Dashboard() {
               <Columns size={16} />
               Pipeline
             </button>
+            <button 
+              className={`tab-item ${activeTab === 'settings' ? 'active' : ''}`}
+              onClick={() => setActiveTab('settings')}
+            >
+              <Settings size={16} />
+              Configurações
+            </button>
           </nav>
         </div>
 
         <div className="topbar-right">
-          <div className="search-wrap" style={{ marginRight: '16px' }}>
-            <Search size={14} className="search-icon" />
-            <input
-              className="search-input"
-              placeholder="Buscar lead..."
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              style={{ width: '200px' }}
-            />
-          </div>
+          {activeTab !== 'settings' && (
+            <div className="search-wrap" style={{ marginRight: '16px' }}>
+              <Search size={14} className="search-icon" />
+              <input
+                className="search-input"
+                placeholder="Buscar lead..."
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                style={{ width: '200px' }}
+              />
+            </div>
+          )}
           <button 
             className="btn btn-primary" 
             style={{ marginRight: '12px' }}
@@ -149,7 +159,7 @@ export default function Dashboard() {
           </div>
         ) : (
           <>
-            {activeTab === 'metrics' ? (
+            {activeTab === 'metrics' && (
               <div className="metrics-page animate-fade">
                 <div style={{ marginBottom: '24px' }}>
                   <h2 style={{ fontSize: '24px', fontWeight: 700 }}>Performance Comercial</h2>
@@ -157,7 +167,8 @@ export default function Dashboard() {
                 </div>
                 <MetricsView leads={leads} />
               </div>
-            ) : (
+            )}
+            {activeTab === 'pipeline' && (
               <div className="pipeline-page animate-fade" style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
                 <div style={{ marginBottom: '16px' }}>
                   <KpiHeader leads={filteredLeads} />
@@ -170,6 +181,11 @@ export default function Dashboard() {
                     onStageChange={handleStageChange}
                   />
                 </div>
+              </div>
+            )}
+            {activeTab === 'settings' && (
+              <div className="animate-fade">
+                <SettingsView />
               </div>
             )}
           </>
