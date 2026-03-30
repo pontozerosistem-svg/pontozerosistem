@@ -1,5 +1,6 @@
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
 import { supabase } from '../_shared/db.ts';
+import { STAGES } from '../_shared/stages.ts';
 
 // Configuração da Evolution API
 const EVOLUTION_API_URL = Deno.env.get('EVOLUTION_API_URL');
@@ -69,7 +70,7 @@ serve(async (req) => {
     // Atualiza o card para "Apresentação" (stage_id = 4)
     await supabase
       .from('leads')
-      .update({ stage_id: 4 })
+      .update({ stage_id: STAGES.REUNIAO_AGENDADA })
       .eq('id', lead.id);
 
     // Atualiza o cérebro da inteligência para 'confirmado' para ela não dar mais follow-up

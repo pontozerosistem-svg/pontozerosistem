@@ -10,7 +10,7 @@ import MetricsView from '../components/MetricsView'
 
 const STAGES_COLORS: Record<number, string> = {
   1: '#94a3b8', 2: '#3b82f6', 3: '#f59e0b', 4: '#8b5cf6',
-  5: '#ec4899', 6: '#f97316', 7: '#22c55e', 8: '#ef4444',
+  5: '#22c55e', 6: '#ef4444'
 }
 
 export default function Dashboard() {
@@ -125,14 +125,6 @@ export default function Dashboard() {
               style={{ width: '200px' }}
             />
           </div>
-          <button 
-            className="btn btn-secondary" 
-            style={{ marginRight: '12px' }}
-            onClick={() => navigate('/whatsapp')}
-          >
-            <Smartphone size={16} />
-            Conectar WhatsApp
-          </button>
           <button 
             className="btn btn-primary" 
             style={{ marginRight: '12px' }}

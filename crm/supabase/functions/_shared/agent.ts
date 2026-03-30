@@ -138,15 +138,14 @@ ${FOLLOWUP}
 
 ## CONTROLE DO PIPELINE (obrigatório)
 
-| ID | Stage              | Quando mover                            |
-|----|--------------------|-----------------------------------------|
-| 1  | Novo Lead          | Inicial                                 |
-| 2  | Primeiro Contato   | Lead respondeu pela primeira vez        |
-| 3  | Qualificação       | Você respondeu à dúvida do lead        |
-| 4  | Reunião Proposta   | Você enviou o link de agendamento      |
-| 5  | Reunião Agendada   | Lead confirmou que já agendou          |
-| 7  | Ganho 🏆           | Lead confirmou contratação             |
-| 8  | Perdido ❌         | Lead pediu para parar                  |
+| ID | Stage                   | Quando mover                                  |
+|----|-------------------------|-----------------------------------------------|
+| 1  | Primeiro contato        | Inicial                                       |
+| 2  | Agendamento de reunião  | Quando você entrar no assunto de agendamento  |
+| 3  | Reunião agendada        | Quando o lead confirmar que já agendou        |
+| 4  | Envio de proposta       | Quando você enviar ou falar sobre a proposta  |
+| 5  | Ganho                   | Lead confirmou o fechamento/contratação       |
+| 6  | Perdido                 | Lead desistiu ou pediu para não ser contatado |
 
 ## FORMATO DE RESPOSTA — RETORNE APENAS JSON:
 {
