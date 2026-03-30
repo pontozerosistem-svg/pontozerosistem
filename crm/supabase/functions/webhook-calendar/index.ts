@@ -67,7 +67,7 @@ serve(async (req) => {
 
     const lead = leads[0];
 
-    // Atualiza o card para "Apresentação" (stage_id = 4)
+    // Atualiza o card para "Reunião agendada" (stage_id = 3)
     await supabase
       .from('leads')
       .update({ stage_id: STAGES.REUNIAO_AGENDADA })
@@ -75,7 +75,7 @@ serve(async (req) => {
 
     // Atualiza o cérebro da inteligência para 'confirmado' para ela não dar mais follow-up
     await supabase
-      .from('agent_states')
+      .from('agent_state')
       .update({ phase: 'confirmado' })
       .eq('lead_id', lead.id);
 
