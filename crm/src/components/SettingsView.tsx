@@ -72,8 +72,8 @@ export default function SettingsView() {
         .update({ agent_enabled: agentEnabled, consultant_phone: consultantPhone })
         .eq('id', 1)
 
-      // Deleta todos os slots e insere os novos
-      await supabase.from('professional_availability').delete().gte('day_of_week', 0)
+      // Deleta todos os slots (semanais e datas específicas) e insere os novos
+      await supabase.from('professional_availability').delete().neq('id', '00000000-0000-0000-0000-000000000000')
 
       if (slots.length > 0) {
         const toInsert = slots.map(s => ({

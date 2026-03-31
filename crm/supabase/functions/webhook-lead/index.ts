@@ -107,11 +107,16 @@ serve(async (req) => {
 
       console.log(`[webhook-lead] Novo lead criado: ${leadId} | ${phone}`);
 
-      // ── Dispara primeira mensagem no WhatsApp ───────────
-      await triggerFirstMessage(leadId, phone, finalName);
+      // ── Dispara primeira mensagem no WhatsApp (em background) ───
+      const backgroundWork = triggerFirstMessage(leadId, phone, finalName);
+      
+      // @ts-ignore: Supabase Edge Runtime support
+      if (typeof EdgeRuntime !== 'undefined' && EdgeRuntime.waitUntil) {
+        EdgeRuntime.waitUntil(backgroundWork);
+      }
     }
 
-    return Response.json({ success: true, lead_id: leadId });
+    return Response.json({ success: true, lead_id: leadId }, { headers: corsHeaders });
 
   } catch (err) {
     console.error('[webhook-lead] Erro:', err);
@@ -126,7 +131,7 @@ async function triggerFirstMessage(leadId: string, phone: string, name?: string)
 
   const msg1 = `${saudacao} eu sou a Luiza aqui da Ponto Zero e vou dar sequência ao seu atendimento.`;
   const msg2 = `Aqui nós acreditamos muito que a forma que você se posiciona é crucial para o cliente te perceber como autoridade, mas também para você se sentir bem e saber que o que você mostra está coerente com sua essência, seus valores e suas capacidades.`;
-  const msg3 = `Como cada pessoa é um mundo inteiro, nosso processo é altamente particular e personalizado.\n\nPor isso, a melhor forma de prosseguirmos é com uma sessão de diagnóstico com nosso consultor responsável. Essa reunião não tem custo e o objetivo é entender sua demanda para fazer uma proposta totalmente coerente com seu momento e ambições.\n\nPodemos agendar a sua?`;
+  const msg3 = `Hoje você ja atua no mercado ou esta iniciando e quer comecar ja com um posicionamento alinhado?`;
 
   const fullText = `${msg1}\n\n${msg2}\n\n${msg3}`;
   await saveMessage(leadId, 'assistant', fullText);

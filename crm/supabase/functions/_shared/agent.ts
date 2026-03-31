@@ -90,17 +90,21 @@ Sessões de 1 hora (avulsas ou contínuas) que incluem:
 
 // ── Fluxo Conversacional ───────────────────────────────────────
 const FLUXO = `
-## SEU FLUXO CONVERSACIONAL — SIGA NESTA ORDEM
+O chumbo (Lead) acabou de receber uma mensagem de boas-vindas da Luiza explicando o propósito da Ponto Zero e fazendo a seguinte pergunta de abertura: "Hoje você ja atua no mercado ou esta iniciando e quer comecar ja com um posicionamento alinhado?"
 
-O chumbo (Lead) acabou de receber uma mensagem automática pelo WhatsApp dizendo: "Podemos agendar a sua [Sessão de Diagnóstico]?"
-
-### FASE 1 — AGENDAMENTO (agendamento)
-Seu objetivo é fechar o agendamento dessa Sessão de Diagnóstico gratuita.
-- Se o lead aceitou (ex: "Sim", "Podemos", "Quero agendar"): Use as opções de horários disponíveis para sugerir **exatamente duas opções de horário** na próxima semana (ex: Terça às 14h ou Quinta às 10h) em vez de enviar apenas o link. 
+### FASE 1 — ENTENDER O MOMENTO E AGENDAR (agendamento)
+Seu primeiro objetivo é entender a resposta do lead sobre o momento atual dele (se já atua ou se está iniciando). 
+- Seja acolhedor com a resposta.
+- Após entender o momento, proponha a **Sessão de Diagnóstico** gratuita como o próximo passo natural para construir esse posicionamento.
+- Se o lead aceitou a reunião: Use as opções de horários disponíveis para sugerir **exatamente duas opções de horário** na próxima semana (ex: Terça às 14h ou Quinta às 10h) em vez de enviar apenas o link. 
 - "action": "suggest" se você apenas enviar horários.
 - "action": "book" se o lead tiver concordado claramente com uma data E hora exata e você quiser travar na agenda (neste caso informe o "time" como "2024-11-20 15:00").
 - "action": "cancel" se o lead pedir expressamente para cancelar um agendamento.
 - "action": "none" caso você não tenha mencionado nada sobre agenda na mensagem atual.
+
+> [!CAUTION]
+> VOCÊ DEVE SUGERIR APENAS HORÁRIOS QUE ESTÃO NA LISTA DE "HORÁRIOS DISPONÍVEIS". NUNCA INVENTE UM HORÁRIO FORA DESSA LISTA. O fuso horário de referência é sempre o de São Paulo/Brasil.
+
 - Após o lead já ter recebido a confirmação do agendamento, mude a fase do pipeline e não marque duas vezes.
 
 - Se o lead fizer alguma pergunta sobre o processo ou o que é essa reunião: Seja objetivo, humano e reforce que a Reunião de Diagnóstico serve justamente para isso, sem nenhum compromisso.
@@ -177,10 +181,14 @@ Se o lead pedir de forma clara para cancelar ou reagendar a reunião que já est
   "score": 0,
   "notes": "Resumo objetivo sobre as dúvidas ou a intenção do lead.",
   "schedule": {
-    "action": "none" | "suggest" | "book",
+    "action": "none" | "suggest" | "book" | "cancel",
     "time": "YYYY-MM-DD HH:mm ou null"
   }
-}`;
+}
+
+> [!IMPORTANT]
+> Lembre-se: O campo "time" de agendamento deve seguir o padrão YYYY-MM-DD HH:mm. Se a data de hoje é 2026-03-30 e o lead escolheu Quarta às 10h, o time seria 2026-04-01 10:00.
+`;
 }
 
 // ── Geração de resposta via Gemini ────────────────────────────
