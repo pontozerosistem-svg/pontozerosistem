@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
-import { Plus, Trash2, Save, RefreshCw } from 'lucide-react'
+import { Plus, Trash2, Save, RefreshCw, Clock, Bot } from 'lucide-react'
+import AgentPlayground from './AgentPlayground'
 
 const DAYS = [
   { id: 0, label: 'Domingo' },
@@ -21,6 +21,7 @@ interface Slot {
 }
 
 export default function SettingsView() {
+  const [activeTab, setActiveTab] = useState<'hours' | 'agent'>('hours')
   const [agentEnabled, setAgentEnabled] = useState(true)
   const [consultantPhone, setConsultantPhone] = useState('')
   const [slots, setSlots] = useState<Slot[]>([])
@@ -104,91 +105,193 @@ export default function SettingsView() {
   }
 
   return (
-    <div style={{ maxWidth: 800, margin: '0 auto', padding: '20px' }}>
-      <h2 style={{ fontSize: 24, fontWeight: 700, marginBottom: 24 }}>Configurações do Sistema</h2>
-
-      {/* Agent Settings */}
-      <div className="card glass" style={{ padding: 24, marginBottom: 20 }}>
-        <h3 style={{ fontSize: 17, fontWeight: 600, marginBottom: 16 }}>🤖 Agente de IA</h3>
-
-        <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', marginBottom: 16 }}>
-          <div
-            onClick={() => setAgentEnabled(v => !v)}
-            style={{
-              width: 44, height: 24, borderRadius: 12, background: agentEnabled ? 'var(--accent)' : 'var(--border)',
-              position: 'relative', transition: 'background 0.2s', flexShrink: 0, cursor: 'pointer',
+    <div style={{ maxWidth: 1000, margin: '0 auto', padding: '20px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
+        <h2 style={{ fontSize: 24, fontWeight: 700 }}>Configurações do Sistema</h2>
+        
+        {/* Tabs */}
+        <div style={{ display: 'flex', background: 'var(--bg-elevated)', padding: 4, borderRadius: 10, border: '1px solid var(--border)' }}>
+          <button 
+            onClick={() => setActiveTab('hours')}
+            style={{ 
+              display: 'flex', alignItems: 'center', gap: 8, padding: '8px 16px', borderRadius: 8, border: 'none', fontSize: 13, fontWeight: 600, cursor: 'pointer',
+              background: activeTab === 'hours' ? 'var(--bg-base)' : 'transparent',
+              color: activeTab === 'hours' ? 'var(--accent)' : 'var(--text-muted)',
+              boxShadow: activeTab === 'hours' ? '0 2px 8px rgba(0,0,0,0.2)' : 'none',
+              transition: 'all 0.2s'
             }}
           >
-            <div style={{
-              width: 18, height: 18, borderRadius: '50%', background: 'white',
-              position: 'absolute', top: 3,
-              left: agentEnabled ? 23 : 3,
-              transition: 'left 0.2s',
-              boxShadow: '0 1px 4px rgba(0,0,0,0.3)',
-            }} />
-          </div>
-          <span style={{ fontSize: 15 }}>
-            {agentEnabled ? 'Respostas automáticas ativadas' : 'Respostas automáticas desativadas'}
-          </span>
-        </label>
-
-        <div>
-          <label style={{ fontSize: 13, color: 'var(--text-muted)', display: 'block', marginBottom: 6 }}>
-            📱 WhatsApp do Consultor (para lembretes)
-          </label>
-          <input
-            type="text"
-            className="input"
-            value={consultantPhone}
-            onChange={e => setConsultantPhone(e.target.value)}
-            placeholder="Ex: 5511999999999"
-            style={{ maxWidth: 340 }}
-          />
-          <p style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>
-            Receberá notificação 30 min antes de cada reunião e o link da videochamada.
-          </p>
+            <Clock size={16} /> Horários
+          </button>
+          <button 
+            onClick={() => setActiveTab('agent')}
+            style={{ 
+              display: 'flex', alignItems: 'center', gap: 8, padding: '8px 16px', borderRadius: 8, border: 'none', fontSize: 13, fontWeight: 600, cursor: 'pointer',
+              background: activeTab === 'agent' ? 'var(--bg-base)' : 'transparent',
+              color: activeTab === 'agent' ? 'var(--accent)' : 'var(--text-muted)',
+              boxShadow: activeTab === 'agent' ? '0 2px 8px rgba(0,0,0,0.2)' : 'none',
+              transition: 'all 0.2s'
+            }}
+          >
+            <Bot size={16} /> Simulador de IA
+          </button>
         </div>
       </div>
 
-      {/* Availability */}
-      <div className="card glass" style={{ padding: 24, marginBottom: 20 }}>
-        <h3 style={{ fontSize: 17, fontWeight: 600, marginBottom: 4 }}>📅 Horários de Atendimento</h3>
-        <p style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 20 }}>
-          Adicione um ou mais horários por dia. O agente sugerirá vagas dentro desses intervalos.
-        </p>
+      {activeTab === 'agent' ? (
+        <AgentPlayground />
+      ) : (
+        <>
+          {/* Agent Settings */}
+          <div className="card glass" style={{ padding: 24, marginBottom: 20 }}>
+            <h3 style={{ fontSize: 17, fontWeight: 600, marginBottom: 16 }}>🤖 Agente de IA (Global)</h3>
 
-        {DAYS.map(day => {
-          const daySlots = slots.map((s, idx) => ({ ...s, _idx: idx })).filter(s => s.day_of_week === day.id)
-          return (
-            <div key={day.id} style={{ marginBottom: 16 }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-                <span style={{ fontWeight: 600, fontSize: 14, minWidth: 130 }}>{day.label}</span>
-                <button
-                  className="btn btn-ghost"
-                  style={{ fontSize: 12, padding: '4px 10px', display: 'flex', alignItems: 'center', gap: 4 }}
-                  onClick={() => addSlot(day.id)}
-                >
-                  <Plus size={13} /> Adicionar horário
-                </button>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', marginBottom: 16 }}>
+              <div
+                onClick={() => setAgentEnabled(v => !v)}
+                style={{
+                  width: 44, height: 24, borderRadius: 12, background: agentEnabled ? 'var(--accent)' : 'var(--border)',
+                  position: 'relative', transition: 'background 0.2s', flexShrink: 0, cursor: 'pointer',
+                }}
+              >
+                <div style={{
+                  width: 18, height: 18, borderRadius: '50%', background: 'white',
+                  position: 'absolute', top: 3,
+                  left: agentEnabled ? 23 : 3,
+                  transition: 'left 0.2s',
+                  boxShadow: '0 1px 4px rgba(0,0,0,0.3)',
+                }} />
               </div>
+              <span style={{ fontSize: 15 }}>
+                {agentEnabled ? 'Respostas automáticas ativadas' : 'Respostas automáticas desativadas'}
+              </span>
+            </label>
 
-              {daySlots.length === 0 ? (
-                <p style={{ fontSize: 12, color: 'var(--text-muted)', paddingLeft: 4 }}>Nenhum horário cadastrado.</p>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                  {daySlots.map(slot => (
+            <div>
+              <label style={{ fontSize: 13, color: 'var(--text-muted)', display: 'block', marginBottom: 6 }}>
+                📱 WhatsApp do Consultor (para lembretes)
+              </label>
+              <input
+                type="text"
+                className="input"
+                value={consultantPhone}
+                onChange={e => setConsultantPhone(e.target.value)}
+                placeholder="Ex: 5511999999999"
+                style={{ maxWidth: 340 }}
+              />
+              <p style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>
+                Receberá notificação 30 min antes de cada reunião e o link da videochamada.
+              </p>
+            </div>
+          </div>
+
+          {/* Availability */}
+          <div className="card glass" style={{ padding: 24, marginBottom: 20 }}>
+            <h3 style={{ fontSize: 17, fontWeight: 600, marginBottom: 4 }}>📅 Horários de Atendimento</h3>
+            <p style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 20 }}>
+              Adicione um ou mais horários por dia. O agente sugerirá vagas dentro desses intervalos.
+            </p>
+
+            {DAYS.map(day => {
+              const daySlots = slots.map((s, idx) => ({ ...s, _idx: idx })).filter(s => s.day_of_week === day.id)
+              return (
+                <div key={day.id} style={{ marginBottom: 16 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                    <span style={{ fontWeight: 600, fontSize: 14, minWidth: 130 }}>{day.label}</span>
+                    <button
+                      className="btn btn-ghost"
+                      style={{ fontSize: 12, padding: '4px 10px', display: 'flex', alignItems: 'center', gap: 4 }}
+                      onClick={() => addSlot(day.id)}
+                    >
+                      <Plus size={13} /> Adicionar horário
+                    </button>
+                  </div>
+
+                  {daySlots.length === 0 ? (
+                    <p style={{ fontSize: 12, color: 'var(--text-muted)', paddingLeft: 4 }}>Nenhum horário cadastrado.</p>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      {daySlots.map(slot => (
+                        <div
+                          key={slot._idx}
+                          style={{
+                            display: 'flex', alignItems: 'center', gap: 10,
+                            background: 'var(--bg-elevated)', borderRadius: 8, padding: '10px 14px',
+                          }}
+                        >
+                          <input
+                            type="time"
+                            className="input"
+                            value={slot.start_time.substring(0, 5)}
+                            onChange={e => updateSlot(slot._idx, 'start_time', e.target.value)}
+                            style={{ width: 120 }}
+                          />
+                          <span style={{ color: 'var(--text-muted)', fontSize: 13 }}>até</span>
+                          <input
+                            type="time"
+                            className="input"
+                            value={slot.end_time.substring(0, 5)}
+                            onChange={e => updateSlot(slot._idx, 'end_time', e.target.value)}
+                            style={{ width: 120 }}
+                          />
+                          <button
+                            className="btn btn-ghost"
+                            style={{ color: '#ef4444', padding: '4px 8px' }}
+                            onClick={() => removeSlot(slot._idx)}
+                          >
+                            <Trash2 size={15} />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+
+          {/* Specific Dates */}
+          <div className="card glass" style={{ padding: 24, marginBottom: 20 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+              <h3 style={{ fontSize: 17, fontWeight: 600 }}>🌟 Datas Específicas / Exceções</h3>
+              <button
+                className="btn btn-ghost"
+                style={{ fontSize: 12, padding: '4px 10px', display: 'flex', alignItems: 'center', gap: 4 }}
+                onClick={() => addSlot(undefined, true)}
+              >
+                <Plus size={13} /> Adicionar data
+              </button>
+            </div>
+            <p style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 20 }}>
+              Defina horários para uma data específica (exibe prioritariamente sobre a regra semanal).
+            </p>
+
+            {slots.map((s, idx) => ({ ...s, _idx: idx })).filter(s => s.specific_date).length === 0 ? (
+              <p style={{ fontSize: 12, color: 'var(--text-muted)', paddingLeft: 4 }}>Nenhuma data específica cadastrada.</p>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {slots.map((slot, idx) => {
+                  if (!slot.specific_date) return null
+                  return (
                     <div
-                      key={slot._idx}
+                      key={idx}
                       style={{
                         display: 'flex', alignItems: 'center', gap: 10,
                         background: 'var(--bg-elevated)', borderRadius: 8, padding: '10px 14px',
                       }}
                     >
                       <input
+                        type="date"
+                        className="input"
+                        value={slot.specific_date}
+                        onChange={e => updateSlot(idx, 'specific_date', e.target.value)}
+                        style={{ width: 140 }}
+                      />
+                      <input
                         type="time"
                         className="input"
                         value={slot.start_time.substring(0, 5)}
-                        onChange={e => updateSlot(slot._idx, 'start_time', e.target.value)}
+                        onChange={e => updateSlot(idx, 'start_time', e.target.value)}
                         style={{ width: 120 }}
                       />
                       <span style={{ color: 'var(--text-muted)', fontSize: 13 }}>até</span>
@@ -196,102 +299,36 @@ export default function SettingsView() {
                         type="time"
                         className="input"
                         value={slot.end_time.substring(0, 5)}
-                        onChange={e => updateSlot(slot._idx, 'end_time', e.target.value)}
+                        onChange={e => updateSlot(idx, 'end_time', e.target.value)}
                         style={{ width: 120 }}
                       />
                       <button
                         className="btn btn-ghost"
                         style={{ color: '#ef4444', padding: '4px 8px' }}
-                        onClick={() => removeSlot(slot._idx)}
+                        onClick={() => removeSlot(idx)}
                       >
                         <Trash2 size={15} />
                       </button>
                     </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )
-        })}
-      </div>
-
-      {/* Specific Dates */}
-      <div className="card glass" style={{ padding: 24, marginBottom: 20 }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
-          <h3 style={{ fontSize: 17, fontWeight: 600 }}>🌟 Datas Específicas / Exceções</h3>
-          <button
-            className="btn btn-ghost"
-            style={{ fontSize: 12, padding: '4px 10px', display: 'flex', alignItems: 'center', gap: 4 }}
-            onClick={() => addSlot(undefined, true)}
-          >
-            <Plus size={13} /> Adicionar data
-          </button>
-        </div>
-        <p style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 20 }}>
-          Defina horários para uma data específica (exibe prioritariamente sobre a regra semanal).
-        </p>
-
-        {slots.map((s, idx) => ({ ...s, _idx: idx })).filter(s => s.specific_date).length === 0 ? (
-          <p style={{ fontSize: 12, color: 'var(--text-muted)', paddingLeft: 4 }}>Nenhuma data específica cadastrada.</p>
-        ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {slots.map((slot, idx) => {
-              if (!slot.specific_date) return null
-              return (
-                <div
-                  key={idx}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: 10,
-                    background: 'var(--bg-elevated)', borderRadius: 8, padding: '10px 14px',
-                  }}
-                >
-                  <input
-                    type="date"
-                    className="input"
-                    value={slot.specific_date}
-                    onChange={e => updateSlot(idx, 'specific_date', e.target.value)}
-                    style={{ width: 140 }}
-                  />
-                  <input
-                    type="time"
-                    className="input"
-                    value={slot.start_time.substring(0, 5)}
-                    onChange={e => updateSlot(idx, 'start_time', e.target.value)}
-                    style={{ width: 120 }}
-                  />
-                  <span style={{ color: 'var(--text-muted)', fontSize: 13 }}>até</span>
-                  <input
-                    type="time"
-                    className="input"
-                    value={slot.end_time.substring(0, 5)}
-                    onChange={e => updateSlot(idx, 'end_time', e.target.value)}
-                    style={{ width: 120 }}
-                  />
-                  <button
-                    className="btn btn-ghost"
-                    style={{ color: '#ef4444', padding: '4px 8px' }}
-                    onClick={() => removeSlot(idx)}
-                  >
-                    <Trash2 size={15} />
-                  </button>
-                </div>
-              )
-            })}
+                  )
+                })}
+              </div>
+            )}
           </div>
-        )}
-      </div>
 
-      <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-        <button
-          className="btn btn-primary"
-          style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 24px' }}
-          onClick={handleSave}
-          disabled={saving}
-        >
-          <Save size={16} />
-          {saving ? 'Salvando...' : 'Salvar Configurações'}
-        </button>
-      </div>
+          <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+            <button
+              className="btn btn-primary"
+              style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 24px' }}
+              onClick={handleSave}
+              disabled={saving}
+            >
+              <Save size={16} />
+              {saving ? 'Salvando...' : 'Salvar Configurações'}
+            </button>
+          </div>
+        </>
+      )}
     </div>
   )
 }

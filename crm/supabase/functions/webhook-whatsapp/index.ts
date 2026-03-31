@@ -271,16 +271,17 @@ async function processMessage(jid: string, userText: string) {
 
   const leadId     = lead.id;
   const oldStage   = lead.stage_id ?? STAGES.PRIMEIRO_CONTATO;
-  const agentState = lead.agent_state?.[0] ?? {
-    spin_phase: 'situacao',
+  const agentState = (lead.agent_state?.[0] || lead.agent_state) ?? {
+    spin_phase: 'agendamento',
     spin_data: {},
     follow_up_count: 0,
     is_active: true,
   };
 
-  console.log(`[whatsapp] Lead ID: ${leadId}, Phase: ${agentState.spin_phase}, Count: ${agentState.follow_up_count}`);
-  if (!lead.agent_state || lead.agent_state.length === 0) {
-    console.warn(`[whatsapp] Agent state NÃO encontrado para lead ${leadId} via join - usando default.`);
+  console.log(`[agent-context] Lead: ${leadId} | JID: ${jid} | Phase: ${agentState.spin_phase} | Msgs: ${agentState.follow_up_count}`);
+  
+  if (!lead.agent_state || (Array.isArray(lead.agent_state) && lead.agent_state.length === 0)) {
+    console.warn(`[whatsapp] Agent state NÃO encontrado para lead ${leadId} via join - usando default 'agendamento'.`);
   }
 
   // ── Se identificador é @lid, salva nos metadados para futuros matches ──
@@ -347,6 +348,7 @@ async function processMessage(jid: string, userText: string) {
 
   // Inverte para que a ordem no prompt seja cronológica (mais antigas → mais novas)
   const history = (historyRaw ?? []).reverse();
+  console.log(`[agent-context] Enviando ${history.length} mensagens de histórico para a IA.`);
 
   // ── Gera resposta via agente Gemini ────────────────────
   const agentInput = {
