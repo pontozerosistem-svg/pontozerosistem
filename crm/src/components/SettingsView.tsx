@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { Plus, Trash2, Save, RefreshCw, Clock, Bot } from 'lucide-react'
 import AgentPlayground from './AgentPlayground'
@@ -18,6 +19,7 @@ interface Slot {
   specific_date?: string | null
   start_time: string
   end_time: string
+  _idx?: number // Campo auxiliar para edição
 }
 
 export default function SettingsView() {
@@ -223,7 +225,7 @@ export default function SettingsView() {
                             type="time"
                             className="input"
                             value={slot.start_time.substring(0, 5)}
-                            onChange={e => updateSlot(slot._idx, 'start_time', e.target.value)}
+                            onChange={e => updateSlot(slot._idx!, 'start_time', e.target.value)}
                             style={{ width: 120 }}
                           />
                           <span style={{ color: 'var(--text-muted)', fontSize: 13 }}>até</span>
@@ -231,13 +233,13 @@ export default function SettingsView() {
                             type="time"
                             className="input"
                             value={slot.end_time.substring(0, 5)}
-                            onChange={e => updateSlot(slot._idx, 'end_time', e.target.value)}
+                            onChange={e => updateSlot(slot._idx!, 'end_time', e.target.value)}
                             style={{ width: 120 }}
                           />
                           <button
                             className="btn btn-ghost"
                             style={{ color: '#ef4444', padding: '4px 8px' }}
-                            onClick={() => removeSlot(slot._idx)}
+                            onClick={() => removeSlot(slot._idx!)}
                           >
                             <Trash2 size={15} />
                           </button>
