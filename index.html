@@ -297,9 +297,11 @@
 
   .form-submit {
     width: 100%; background: var(--orange); color: var(--cream); border: none;
-    padding: 18px; font-family: 'DM Sans', sans-serif; font-size: 11px; font-weight: 600;
-    letter-spacing: 0.2em; text-transform: uppercase; cursor: pointer;
+    padding: 16px 10px; font-family: 'DM Sans', sans-serif; font-size: 11px; font-weight: 600;
+    letter-spacing: 0.15em; text-transform: uppercase; cursor: pointer;
     margin-top: 8px; transition: all 0.4s ease; position: relative; overflow: hidden;
+    line-height: 1.5; display: flex; align-items: center; justify-content: center;
+    min-height: 48px; white-space: nowrap;
   }
   .form-submit::before { content: ''; position: absolute; inset: 0; background: var(--green); transform: translateX(-100%); transition: transform 0.4s ease; }
   .form-submit:hover::before { transform: translateX(0); }
@@ -307,6 +309,15 @@
   .form-submit:disabled { opacity: 0.6; cursor: not-allowed; }
   .form-submit:disabled::before { display: none; }
   .form-privacy { font-size: 10px; color: rgba(238,237,233,0.2); margin-top: 14px; text-align: center; line-height: 1.6; }
+
+  /* CUSTOM SCROLLBAR - Ponto Zero Aesthetics */
+  .modal-content::-webkit-scrollbar { width: 4px; }
+  .modal-content::-webkit-scrollbar-track { background: transparent; }
+  .modal-content::-webkit-scrollbar-thumb { background: rgba(216,98,38,0.5); border-radius: 10px; }
+  .modal-content::-webkit-scrollbar-thumb:hover { background: var(--orange); }
+  
+  /* Firefox support */
+  .modal-content { scrollbar-width: thin; scrollbar-color: rgba(216,98,38,0.5) transparent; }
 
   /* ========== THANK YOU PAGE ========== */
   .thanks-page {
@@ -377,6 +388,24 @@
     .thanks-content { padding: 60px 28px; }
     footer { flex-direction: column; gap: 12px; text-align: center; padding: 32px; }
   }
+
+  /* CUSTOM SCROLLBAR - Ponto Zero Aesthetics */
+  ::-webkit-scrollbar { width: 8px; }
+  ::-webkit-scrollbar-track { background: var(--black); }
+  ::-webkit-scrollbar-thumb { background: var(--orange); border-radius: 4px; }
+  ::-webkit-scrollbar-thumb:hover { background: #e87a41; }
+  
+  /* Firefox support */
+  * { scrollbar-width: thin; scrollbar-color: var(--orange) var(--black); }
+
+  /* CUSTOM SCROLLBAR - Ponto Zero Aesthetics */
+  ::-webkit-scrollbar { width: 8px; }
+  ::-webkit-scrollbar-track { background: var(--black); }
+  ::-webkit-scrollbar-thumb { background: var(--orange); border-radius: 4px; }
+  ::-webkit-scrollbar-thumb:hover { background: #e87a41; }
+  
+  /* Firefox support */
+  * { scrollbar-width: thin; scrollbar-color: var(--orange) var(--black); }
 </style>
 </head>
 <body>
@@ -624,41 +653,44 @@
     if (e.key === 'Escape') closeModal();
   });
 
-  async function submitForm() {
+  function submitForm() {
     const nome = document.getElementById('inputNome').value.trim();
     const telefone = document.getElementById('inputTelefone').value.trim();
     const email = document.getElementById('inputEmail').value.trim();
+    
     if (!nome || !telefone || !email) {
       alert('Por favor, preencha todos os campos.');
       return;
     }
+
     const btn = document.getElementById('submitBtn');
     const label = document.getElementById('submitLabel');
     btn.disabled = true;
     label.textContent = 'Enviando...';
-    const anonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp5dWxkamNjcnBtdnpsZ2R4bXRrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ2MTcxMTEsImV4cCI6MjA5MDE5MzExMX0.Zork4rU4pTMAa-2IFXeyzKLEsNP_xdna8VMS4DkDmP8';
-    try {
-      await fetch('https://zyuldjccrpmvzlgdxmtk.supabase.co/functions/v1/webhook-lead', {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'apikey': anonKey,
-          'Authorization': `Bearer ${anonKey}`
-        },
-        body: JSON.stringify({ 
-          nome_completo: nome, 
-          telefone_whatsapp: telefone, 
-          email: email, 
-          canal_origem: 'landing-pontozero' 
-        })
-      });
-    } catch(err) {
-      console.error('Webhook error:', err);
-    }
+
+    // Immediate UI feedback and navigation
     closeModal();
     document.getElementById('landingPage').classList.remove('active');
     document.getElementById('thanksPage').classList.add('active');
     window.scrollTo({ top: 0, behavior: 'smooth' });
+
+    // Background processing
+    const anonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp5dWxkamNjcnBtdnpsZ2R4bXRrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ2MTcxMTEsImV4cCI6MjA5MDE5MzExMX0.Zork4rU4pTMAa-2IFXeyzKLEsNP_xdna8VMS4DkDmP8';
+    
+    fetch('https://zyuldjccrpmvzlgdxmtk.supabase.co/functions/v1/webhook-lead', {
+      method: 'POST',
+      headers: { 
+        'Content-Type': 'application/json',
+        'apikey': anonKey,
+        'Authorization': `Bearer ${anonKey}`
+      },
+      body: JSON.stringify({ 
+        nome_completo: nome, 
+        telefone_whatsapp: telefone, 
+        email: email, 
+        canal_origem: 'landing-pontozero' 
+      })
+    }).catch(err => console.error('Background webhook failed:', err));
   }
 </script>
 </body>

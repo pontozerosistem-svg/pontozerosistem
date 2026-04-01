@@ -1,9 +1,9 @@
 import { saveMessage } from './db.ts';
 
-const OPENAI_KEY = Deno.env.get('OPENAI_API_KEY')!;
-const EVO_BASE   = Deno.env.get('EVOLUTION_API_URL')!;
-const EVO_KEY    = Deno.env.get('EVOLUTION_API_KEY')!;
-const EVO_INST   = Deno.env.get('EVOLUTION_INSTANCE')!;
+const OPENAI_KEY = Deno.env.get('OPENAI_API_KEY') || '';
+const EVO_BASE   = Deno.env.get('EVOLUTION_API_URL') || '';
+const EVO_KEY    = Deno.env.get('EVOLUTION_API_KEY') || '';
+const EVO_INST   = Deno.env.get('EVOLUTION_INSTANCE') || '';
 const LUIZA_ID   = '306215b6-2442-4ea2-aaff-d4c94a61639b';
 
 /**
