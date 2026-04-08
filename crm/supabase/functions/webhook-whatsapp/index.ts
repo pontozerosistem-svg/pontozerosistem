@@ -309,7 +309,7 @@ async function processMessage(jid: string, userText: string, instanceName?: stri
     const nowLocal = new Date(new Date().toLocaleString("en-US", { timeZone: "America/Sao_Paulo" }));
 
     // Lista os próximos 14 dias para dar opções ao lead
-    for (let i = 1; i <= 14; i++) {
+    for (let i = 0; i <= 14; i++) {
       const d = new Date(nowLocal);
       d.setDate(d.getDate() + i);
 
@@ -327,6 +327,15 @@ async function processMessage(jid: string, userText: string, instanceName?: stri
 
       if (availableSlots.length > 0) {
         for (const slot of availableSlots) {
+          // Se for hoje, filtra os horários que já passaram
+          if (i === 0) {
+            const currentHour = nowLocal.getHours();
+            const currentMinute = nowLocal.getMinutes();
+            const [slotHour, slotMinute] = slot.start_time.split(':').map(Number);
+            if (slotHour < currentHour || (slotHour === currentHour && slotMinute <= currentMinute)) {
+              continue; // Ignora slots passados hoje
+            }
+          }
           availabilityStr += `${daysMap[dayOfWeek]} (${dateStr}) das ${slot.start_time.substring(0, 5)} às ${slot.end_time.substring(0, 5)}\n`;
         }
       }

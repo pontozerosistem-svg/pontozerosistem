@@ -61,7 +61,7 @@ Deno.serve(async (req: Request) => {
           const daysMap = ['Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado'];
           const nowLocal = new Date(new Date().toLocaleString("en-US", { timeZone: "America/Sao_Paulo" }));
           
-          for (let i = 1; i <= 14; i++) {
+          for (let i = 0; i <= 14; i++) {
               const d = new Date(nowLocal);
               d.setDate(d.getDate() + i);
               const dayOfWeek = d.getDay();
@@ -75,6 +75,14 @@ Deno.serve(async (req: Request) => {
 
               if (availableSlots.length > 0) {
                   for (const slot of availableSlots) {
+                      if (i === 0) {
+                          const currentHour = nowLocal.getHours();
+                          const currentMinute = nowLocal.getMinutes();
+                          const [slotHour, slotMinute] = slot.start_time.split(':').map(Number);
+                          if (slotHour < currentHour || (slotHour === currentHour && slotMinute <= currentMinute)) {
+                              continue;
+                          }
+                      }
                       availabilityStr += `${daysMap[dayOfWeek]} (${dateStr}) das ${slot.start_time.substring(0, 5)} às ${slot.end_time.substring(0, 5)}\n`;
                   }
               }
