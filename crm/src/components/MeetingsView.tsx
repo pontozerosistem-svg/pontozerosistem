@@ -5,7 +5,7 @@ import { Video, Calendar, Clock, User, RefreshCw, CheckCircle, XCircle, AlertCir
 interface Meeting {
   id: string
   lead_id: string
-  scheduled_start: string | null
+  scheduled_at: string | null
   status: string
   meet_link: string | null
   reminder_sent: boolean
@@ -39,7 +39,7 @@ export default function MeetingsView() {
     const { data, error } = await supabase
       .from('meetings')
       .select('*, leads(name, phone)')
-      .order('scheduled_start', { ascending: false })
+      .order('scheduled_at', { ascending: false })
 
     if (!error && data) setMeetings(data as Meeting[])
     setLoading(false)
@@ -60,8 +60,8 @@ export default function MeetingsView() {
 
   const filtered = meetings.filter(m => {
     if (filter === 'all') return true
-    if (!m.scheduled_start) return false
-    const t = new Date(m.scheduled_start)
+    if (!m.scheduled_at) return false
+    const t = new Date(m.scheduled_at)
     return filter === 'upcoming' ? t >= now : t < now
   })
 
@@ -123,7 +123,7 @@ export default function MeetingsView() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           {filtered.map(meeting => {
             const statusCfg = STATUS_CONFIG[meeting.status] || STATUS_CONFIG.proposed
-            const upcoming = isUpcoming(meeting.scheduled_start)
+            const upcoming = isUpcoming(meeting.scheduled_at)
             return (
               <div
                 key={meeting.id}
@@ -167,7 +167,7 @@ export default function MeetingsView() {
                   <div style={{ display: 'flex', gap: 16, fontSize: 13, color: 'var(--text-muted)' }}>
                     <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                       <Clock size={13} />
-                      {formatDateTime(meeting.scheduled_start)}
+                      {formatDateTime(meeting.scheduled_at)}
                     </span>
                     {meeting.leads?.phone && (
                       <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>

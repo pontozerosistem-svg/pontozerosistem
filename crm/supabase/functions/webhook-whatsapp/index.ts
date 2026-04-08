@@ -367,7 +367,7 @@ async function processMessage(jid: string, userText: string, instanceName?: stri
     await supabase.from('meetings').insert({
       id: meetingId,
       lead_id: leadId,
-      scheduled_start: parsedDate.toISOString(),
+      scheduled_at: parsedDate.toISOString(),
       meet_link: meetLink,
       status: 'scheduled',
     });
