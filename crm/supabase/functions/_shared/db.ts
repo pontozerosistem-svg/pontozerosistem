@@ -10,9 +10,14 @@ export async function saveMessage(
   role: 'user' | 'assistant',
   content: string
 ) {
-  await supabase
+  const { error } = await supabase
     .from('conversations')
     .insert({ lead_id: leadId, role, content });
+  
+  if (error) {
+    console.error(`[db] Erro ao salvar mensagem para lead ${leadId}:`, error.message);
+    throw error;
+  }
 }
 
 export async function logActivity(
@@ -22,11 +27,15 @@ export async function logActivity(
   fromStage: number | null,
   toStage: number | null
 ) {
-  await supabase.from('activities').insert({
+  const { error } = await supabase.from('activities').insert({
     lead_id: leadId,
     type,
     description,
     from_stage_id: fromStage,
     to_stage_id:   toStage,
   });
+
+  if (error) {
+    console.error(`[db] Erro ao logar atividade para lead ${leadId}:`, error.message);
+  }
 }

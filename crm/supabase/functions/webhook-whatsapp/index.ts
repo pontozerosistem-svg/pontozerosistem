@@ -187,18 +187,23 @@ async function processMessage(jid: string, userText: string, instanceName?: stri
   console.log(`[whatsapp] Nova mensagem | JID: ${jid} | Instância: ${instanceName} | Texto: ${userText.substring(0, 30)}`);
 
   // 1. Match exato por JID (Telefone ou ID completo)
+  // Tenta encontrar pelo JID completo (@s.whatsapp.net) ou pelo número puro (como salvo na landing page)
   let { data: lead, error: matchError } = await supabase
     .from('leads')
     .select('*, agent_state(*)')
-    .eq('phone', jid)
+    .or(`phone.eq.${jid},phone.eq.${numeric}`)
     .maybeSingle();
 
   if (matchError) {
-    console.error(`[whatsapp] Erro ao buscar lead por JID (${jid}):`, matchError.message);
+    console.error(`[whatsapp] Erro ao buscar lead por JID ou número (${jid}/${numeric}):`, matchError.message);
   }
 
   if (lead) {
-    console.log(`[whatsapp] Lead encontrado por JID exato: ${lead.name || 'Sem nome'} (ID: ${lead.id})`);
+    console.log(`[whatsapp] Lead encontrado: ${lead.name || 'Sem nome'} (ID: ${lead.id}) | Match: ${lead.phone === jid ? 'JID' : 'Numérico'}`);
+    // Se encontrou por numérico, atualiza para JID para acelerar próximos matches
+    if (lead.phone === numeric && !isLid) {
+       await supabase.from('leads').update({ phone: jid }).eq('id', lead.id);
+    }
   }
 
   // 2. Match numérico inteligente — APENAS para números reais
@@ -345,7 +350,12 @@ async function processMessage(jid: string, userText: string, instanceName?: stri
   }
 
   // ── Salva mensagem do usuário ───────────────────────────
-  await saveMessage(leadId, 'user', userText);
+  try {
+    await saveMessage(leadId, 'user', userText);
+  } catch (e: any) {
+    console.warn(`[whatsapp] Falha ao salvar mensagem do usuário no histórico: ${e.message}`);
+    // Não interrompe o fluxo se falhar apenas o histórico (melhor responder sem histórico do que não responder)
+  }
 
   // ── Verifica configurações do agente (Global e por Lead) ────────
   const { data: settings } = await supabase.from('scheduling_settings').select('agent_enabled').maybeSingle();
@@ -484,7 +494,13 @@ async function processMessage(jid: string, userText: string, instanceName?: stri
   }
 
   // ── Salva resposta do agente ────────────────────────────
-  await saveMessage(leadId, 'assistant', reply);
+  try {
+    const hasKey = !!Deno.env.get('OPENAI_API_KEY');
+    console.log(`[agent-debug] Gerando resposta... OpenAI Key presente: ${hasKey}`);
+    await saveMessage(leadId, 'assistant', reply);
+  } catch (e: any) {
+    console.warn(`[whatsapp] Falha ao salvar resposta do agente no histórico: ${e.message}`);
+  }
 
   // ── Atualiza estado do agente (Upsert garante que o estado exista) ──
   const { error: upsertError } = await supabase.from('agent_state').upsert({
