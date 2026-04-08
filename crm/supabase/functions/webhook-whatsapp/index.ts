@@ -89,8 +89,8 @@ Deno.serve(async (req: Request) => {
       jid.includes('@broadcast') || 
       jid.includes('newsletter') ||
       jid.includes('553186460883') ||
-      jid.includes('553899273737') || // Ignora o próprio número do agente Ponto Zero
-      jid === '553899273737@s.whatsapp.net'
+      jid.includes('553891391840') || // Ignora o próprio número do agente Ponto Zero (zeroponto)
+      jid === '553891391840@s.whatsapp.net'
     ) {
       console.log(`[whatsapp] Mensagem ignorada (sistema/próprio agente): ${jid}`);
       return new Response('ok', { status: 200 });
@@ -167,7 +167,7 @@ function normalizeJid(rawJid: string, event: any, dataObj: any): string {
       typeof candidate === 'string' && 
       candidate.includes('@s.whatsapp.net') &&
       !candidate.includes('553186460883') && // antigo número do agente
-      !candidate.includes('5538999273737')   // novo número do agente Ponto Zero
+      !candidate.includes('553891391840')    // número do agente Ponto Zero (zeroponto)
     ) {
       return candidate;
     }

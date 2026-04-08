@@ -22,22 +22,22 @@ Frontend React ──▶ Supabase DB (leitura direta via anon key)
 
 ## Projeto Supabase
 
-- **Project Ref**: `ekyisfmxmxcwtgdwvfen`
+- **Project Ref**: `zyuldjccrpmvzlgdxmtk`
 - **Região**: São Paulo (`sa-east-1`)
-- **Dashboard**: https://supabase.com/dashboard/project/ekyisfmxmxcwtgdwvfen
+- **Dashboard**: https://supabase.com/dashboard/project/zyuldjccrpmvzlgdxmtk
 
 ### URLs das Edge Functions
 | Função | URL |
 |--------|-----|
-| `webhook-lead` | `https://ekyisfmxmxcwtgdwvfen.supabase.co/functions/v1/webhook-lead` |
-| `webhook-whatsapp` | `https://ekyisfmxmxcwtgdwvfen.supabase.co/functions/v1/webhook-whatsapp` |
+| `webhook-lead` | `https://zyuldjccrpmvzlgdxmtk.supabase.co/functions/v1/webhook-lead` |
+| `webhook-whatsapp` | `https://zyuldjccrpmvzlgdxmtk.supabase.co/functions/v1/webhook-whatsapp` |
 
 ---
 
 ## Configuração
 
 ### 1. Secrets no Supabase
-https://supabase.com/dashboard/project/ekyisfmxmxcwtgdwvfen/settings/functions
+https://supabase.com/dashboard/project/zyuldjccrpmvzlgdxmtk/settings/functions
 
 ```
 OPENAI_API_KEY=sk-proj-...
@@ -47,12 +47,12 @@ EVOLUTION_INSTANCE=nome-da-instancia
 ```
 
 ### 2. Evolution API — Webhook
-- **URL**: `https://ekyisfmxmxcwtgdwvfen.supabase.co/functions/v1/webhook-whatsapp`
+- **URL**: `https://zyuldjccrpmvzlgdxmtk.supabase.co/functions/v1/webhook-whatsapp`
 - **Evento**: `messages.upsert`
 
 ### 3. Landing Page — Endpoint
 ```
-POST https://ekyisfmxmxcwtgdwvfen.supabase.co/functions/v1/webhook-lead
+POST https://zyuldjccrpmvzlgdxmtk.supabase.co/functions/v1/webhook-lead
 Content-Type: application/json
 
 { "nome_completo": "...", "telefone_whatsapp": "5511999999999", "canal_origem": "landing_page" }
