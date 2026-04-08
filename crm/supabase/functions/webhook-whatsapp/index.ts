@@ -356,44 +356,67 @@ async function processMessage(jid: string, userText: string, instanceName?: stri
   // ── Trata agendamento via JSON ou fallback ───────────────
   let reply = rawReply;
   if (schedule && schedule.action === 'book' && schedule.time) {
-    // Se a IA decidiu agendar um horário
-    const parsedDate = new Date(schedule.time + ":00-03:00"); // Offset BR
+    // Tenta fazer o parse da data normalmente (escrúpulo: "2026-04-15 19:00")
+    let parsedDate = new Date(schedule.time + ":00-03:00"); // Offset BR
 
-    // Gera link Jitsi único (sem API key)
-    const meetingId = crypto.randomUUID();
-    const meetSlug = `PontoZero-${meetingId.replace(/-/g, '').substring(0, 10).toUpperCase()}`;
-    const meetLink = `https://meet.jit.si/${meetSlug}`;
-
-    await supabase.from('meetings').insert({
-      id: meetingId,
-      lead_id: leadId,
-      scheduled_at: parsedDate.toISOString(),
-      meet_link: meetLink,
-      status: 'scheduled',
-    });
-
-    console.log(`[calendar] Agendamento confirmado para lead ${leadId} em ${parsedDate.toISOString()} | Link: ${meetLink}`);
-
-    // Trunca a mensagem do LLM se houver [REUNIÃO_AGENDADA_AQUI] e substitui
-    if (reply.includes('[REUNIÃO_AGENDADA_AQUI]')) {
-      reply = reply.replace('[REUNIÃO_AGENDADA_AQUI]', `\nLink da Reunião: ${meetLink}\n`);
-    } else {
-      // Se a IA esqueceu a tag, forçamos o link no final da mensagem
-      reply += `\n\nLink da Reunião: ${meetLink}`;
+    // Tenta arrumar a data se a IA mandou algo "quebrado" como "15/04 19:00" em vez de "2026-04-15 19:00"
+    if (isNaN(parsedDate.getTime()) && schedule.time.includes('/')) {
+        const [datePart, timePart] = schedule.time.split(' ');
+        if (datePart && timePart) {
+            const [DD, MM] = datePart.split('/');
+            const year = new Date().getFullYear();
+            // Refaz o parse com padrão ISO aceitável
+            parsedDate = new Date(`${year}-${MM}-${DD}T${timePart}:00-03:00`);
+        }
     }
 
-    // ── Notifica o consultor imediatamente sobre o novo agendamento
-    console.log(`[calendar] Verificando consultant_phone para notificação: ${settings?.consultant_phone}`);
-    if (settings?.consultant_phone) {
-      try {
-        const leadName = lead.name || jid.split('@')[0];
-        const localDate = parsedDate.toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' });
-        const consultMsg = `🔔 *Nova Reunião Agendada!*\n\nO lead *${leadName}* acabou de confirmar uma reunião com a IA.\n\n📅 *Data:* ${localDate}\n🔗 *Link Jitsi:* ${meetLink}\n\nEntre no link no horário marcado!`;
-        await sendWhatsApp(settings.consultant_phone, consultMsg);
-        console.log(`[calendar] Notificação enviada ao consultor ${settings.consultant_phone} sobre o agendamento do lead ${leadId}`);
-      } catch (e) {
-        console.error(`[calendar] Erro ao notificar consultor sobre a reunião do lead ${leadId}:`, e);
+    try {
+      if (isNaN(parsedDate.getTime())) {
+        throw new Error("Formato de data inválido gerado pela IA: " + schedule.time);
       }
+
+      // Gera link Jitsi único (sem API key)
+      const meetingId = crypto.randomUUID();
+      const meetSlug = `PontoZero-${meetingId.replace(/-/g, '').substring(0, 10).toUpperCase()}`;
+      const meetLink = `https://meet.jit.si/${meetSlug}`;
+
+      const { error: insErr } = await supabase.from('meetings').insert({
+        id: meetingId,
+        lead_id: leadId,
+        scheduled_at: parsedDate.toISOString(),
+        meet_link: meetLink,
+        status: 'scheduled',
+      });
+      if (insErr) throw insErr;
+
+      console.log(`[calendar] Agendamento confirmado para lead ${leadId} em ${parsedDate.toISOString()} | Link: ${meetLink}`);
+
+      // Trunca a mensagem do LLM se houver [REUNIÃO_AGENDADA_AQUI] e substitui
+      if (reply.includes('[REUNIÃO_AGENDADA_AQUI]')) {
+        reply = reply.replace('[REUNIÃO_AGENDADA_AQUI]', `\nLink da Reunião: ${meetLink}\n`);
+      } else {
+        // Se a IA esqueceu a tag, forçamos o link no final da mensagem
+        reply += `\n\nLink da Reunião: ${meetLink}`;
+      }
+
+      // ── Notifica o consultor imediatamente sobre o novo agendamento
+      console.log(`[calendar] Verificando consultant_phone para notificação: ${settings?.consultant_phone}`);
+      if (settings?.consultant_phone) {
+        try {
+          const leadName = lead.name || jid.split('@')[0];
+          const localDate = parsedDate.toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' });
+          const consultMsg = `🔔 *Nova Reunião Agendada!*\n\nO lead *${leadName}* acabou de confirmar uma reunião com a IA.\n\n📅 *Data:* ${localDate}\n🔗 *Link Jitsi:* ${meetLink}\n\nEntre no link no horário marcado!`;
+          await sendWhatsApp(settings.consultant_phone, consultMsg);
+          console.log(`[calendar] Notificação enviada ao consultor ${settings.consultant_phone} sobre o agendamento`);
+        } catch (e) {
+          console.error(`[calendar] Erro ao notificar consultor sobre a reunião do lead ${leadId}:`, e);
+        }
+      }
+    } catch (err: any) {
+      console.error(`[calendar] ERRO CRÍTICO NO AGENDAMENTO:`, err.message);
+      // Fallback amigável: se der qualquer erro (data inválida, banco de dados fora), envia link manual
+      const BOOKING_URL = Deno.env.get('GOOGLE_CALENDAR_BOOKING_URL') || 'https://calendar.app.google/SG2KftSo31iS7DJy5';
+      reply += `\n\n*(Tive um probleminha para gerar sua sala virtual agora, por favor me confirme o horário escolhendo no link abaixo)*\n📅 *Agende sua Reunião:* ${BOOKING_URL}`;
     }
 
   } else if (schedule && schedule.action === 'cancel') {
