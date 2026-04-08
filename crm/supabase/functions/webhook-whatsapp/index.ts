@@ -8,14 +8,14 @@
 
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
 import { supabase, saveMessage, logActivity } from '../_shared/db.ts';
-import { sendWhatsApp }                       from '../_shared/evolution.ts';
-import { generateAgentReply }                 from '../_shared/agent.ts';
-import { STAGES, STAGE_NAMES }               from '../_shared/stages.ts';
-import { getAudioBase64, transcribeAudio }    from '../_shared/audio.ts';
+import { sendWhatsApp } from '../_shared/evolution.ts';
+import { generateAgentReply } from '../_shared/agent.ts';
+import { STAGES, STAGE_NAMES } from '../_shared/stages.ts';
+import { getAudioBase64, transcribeAudio } from '../_shared/audio.ts';
 
 
 
-Deno.serve(async (req: Request) => {
+serve(async (req) => {
   const method = req.method;
   const url = req.url;
   console.log(`[webhook-whatsapp] Request: ${method} ${url}`);
@@ -29,6 +29,10 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
+    const hasUrl = !!Deno.env.get('SUPABASE_URL');
+    const hasKey = !!Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    console.log(`[whatsapp-diag] Iniciando processamento. URL: ${hasUrl}, Key: ${hasKey}`);
+
     const rawBody = await req.text();
     if (!rawBody) {
       console.warn('[webhook-whatsapp] Body vazio recebido.');
@@ -39,8 +43,6 @@ Deno.serve(async (req: Request) => {
     try {
       event = JSON.parse(rawBody);
       console.log(`[DEBUG-RAW] Evento: ${event.event || event.type} | Instance: ${event.instance}`);
-      // Log completo do payload para debugar campos ausentes
-      console.log('[DEBUG-PAYLOAD]:', JSON.stringify(event, null, 2));
     } catch (e: any) {
       console.error('[webhook-whatsapp] Falha ao parsear JSON:', e.message);
       return new Response('ok', { status: 200 });
@@ -55,7 +57,7 @@ Deno.serve(async (req: Request) => {
 
     // Só processamos se houver conteúdo de mensagem e NÃO for enviado pelo próprio robô
     const hasContent = !!(msg?.conversation || msg?.extendedTextMessage?.text || msg?.audioMessage || msg?.imageMessage?.caption);
-    
+
     if (isFromMe) {
       console.log('[webhook-whatsapp] Ignorando: mensagem enviada pelo próprio agente.');
       return new Response('ok', { status: 200 });
@@ -67,26 +69,21 @@ Deno.serve(async (req: Request) => {
     }
 
     const dataObj = event.data || event; // Tenta pegar do data ou do root
-    const rawJid  = dataObj.key?.remoteJid || dataObj.remoteJid || event.sender;
+    const rawJid = dataObj.key?.remoteJid || dataObj.remoteJid || event.sender;
     const messageId = dataObj.key?.id || dataObj.id;
-    
-    if (!rawJid) {
-       console.warn('[webhook-whatsapp] remoteJid não encontrado no payload.');
-       return new Response('ok', { status: 200 });
-    }
 
     if (!rawJid) {
-       console.warn('[webhook-whatsapp] remoteJid ausente no evento.');
-       return new Response('ok', { status: 200 });
+      console.warn('[webhook-whatsapp] remoteJid não encontrado no payload.');
+      return new Response('ok', { status: 200 });
     }
 
     const jid = normalizeJid(rawJid, event, dataObj);
     const instanceName = event.instance || event.data?.instance || Deno.env.get('EVOLUTION_INSTANCE');
-    
+
     // Filtra Grupos, Comunidades e o próprio Agente
     if (
-      jid.includes('@g.us') || 
-      jid.includes('@broadcast') || 
+      jid.includes('@g.us') ||
+      jid.includes('@broadcast') ||
       jid.includes('newsletter') ||
       jid.includes('553186460883') ||
       jid.includes('553891391840') || // Ignora o próprio número do agente Ponto Zero (zeroponto)
@@ -97,10 +94,10 @@ Deno.serve(async (req: Request) => {
     }
 
     const audioMsg = msg?.audioMessage;
-    
+
     if (audioMsg && messageId && jid) {
-      console.log(`[whatsapp] Áudio detectado de ${jid} (Instância: ${instanceName})`);
-      (async () => {
+      console.log(`[whatsapp] Áudio detectado de ${jid}. Processando em background.`);
+      const audioWork = (async () => {
         try {
           await new Promise(resolve => setTimeout(resolve, 2000));
           const base64 = await getAudioBase64(messageId, jid);
@@ -114,7 +111,15 @@ Deno.serve(async (req: Request) => {
         } catch (e: any) {
           console.error('[audio] Erro no processamento:', e.message);
         }
-      })().catch(err => console.error('[audio] Erro fatal:', err));
+      })();
+
+      // Registrar trabalho em background no Edge Runtime
+      // @ts-ignore
+      if (typeof EdgeRuntime !== 'undefined' && EdgeRuntime.waitUntil) {
+        // @ts-ignore
+        EdgeRuntime.waitUntil(audioWork);
+      }
+
       return new Response('ok', { status: 200 });
     }
 
@@ -124,9 +129,9 @@ Deno.serve(async (req: Request) => {
       msg?.imageMessage?.caption;
 
     if (jid && text) {
-      processMessage(jid, text, instanceName).catch(err =>
-        console.error('[webhook-whatsapp] Erro no processamento:', err)
-      );
+      // IMPORTANTE: Await aqui para garantir que a função não feche prematuramente
+      console.log(`[webhook-whatsapp] Chamando processMessage para ${jid} e AGUARDANDO...`);
+      await processMessage(jid, text, instanceName);
     }
 
     return new Response('ok', { status: 200 });
@@ -142,39 +147,48 @@ Deno.serve(async (req: Request) => {
 // NORMALIZA JID — converte @lid e remove sufixos de dispositivo (:30, etc)
 // ============================================================
 function normalizeJid(rawJid: string, event: any, dataObj: any): string {
-  if (!rawJid) return '';
+  if (!rawJid) return rawJid;
+  
+  if (rawJid.includes('@s.whatsapp.net')) return rawJid;
 
-  // Remove sufixos de dispositivo (ex: 5531...:30@s.whatsapp.net -> 5531...@s.whatsapp.net)
-  let cleanJid = rawJid.split(':')[0];
-  if (!cleanJid.includes('@')) {
-    cleanJid = cleanJid + (rawJid.includes('@lid') ? '@lid' : '@s.whatsapp.net');
-  }
-
-  if (!cleanJid.includes('@lid')) return cleanJid;
-
-  // Candidatos de campos que podem conter o número real em formato @s.whatsapp.net
   const candidates: any[] = [
-    event?.sender,                          // campo sender no nível do evento
-    dataObj?.sender,                        // campo sender no data
-    dataObj?.participant,                   // em grupos, o participant tem o número real
-    dataObj?.phoneNumber,                   // algumas versões da Evolution
-    dataObj?.contact?.id,                   // campo de contato
-    dataObj?.key?.participant,              // participant dentro da key
+    dataObj?.key?.remoteJidAlt,             
+    event?.remoteJidAlt,                    
+    dataObj?.remoteJidAlt,                  
+    event?.senderPn,                        
+    dataObj?.senderPn,                      
+    event?.sender,                          
+    dataObj?.sender,                        
+    dataObj?.phoneNumber,                   
+    dataObj?.contact?.id,                   
+    dataObj?.key?.participant,              
+    dataObj?.participant,                   
   ];
 
-  for (const candidate of candidates) {
-    if (
-      typeof candidate === 'string' && 
-      candidate.includes('@s.whatsapp.net') &&
-      !candidate.includes('553186460883') && // antigo número do agente
-      !candidate.includes('553891391840')    // número do agente Ponto Zero (zeroponto)
-    ) {
-      return candidate;
+  for (let candidate of candidates) {
+    if (!candidate || typeof candidate !== 'string') continue;
+
+    if (candidate.includes('@s.whatsapp.net')) {
+      if (!candidate.includes('553891391840')) { 
+        return candidate;
+      }
+    }
+
+    const numeric = candidate.replace(/\D/g, '');
+    if (numeric.length >= 10 && numeric.length <= 15) {
+      if (numeric !== '553891391840') {
+        const formatted = `${numeric}@s.whatsapp.net`;
+        console.log(`[whatsapp] Número real extraído de "${candidate}": ${formatted}`);
+        return formatted;
+      }
     }
   }
 
-  // Nenhum campo com @s.whatsapp.net encontrado — loga para diagnóstico
-  return rawJid; // retorna @lid original como fallback
+  if (rawJid.includes('@lid')) {
+    console.log(`[whatsapp] Não foi possível extrair número real para o LID: ${rawJid}`);
+  }
+  
+  return rawJid;
 }
 
 // ============================================================
@@ -186,72 +200,31 @@ async function processMessage(jid: string, userText: string, instanceName?: stri
 
   console.log(`[whatsapp] Nova mensagem | JID: ${jid} | Instância: ${instanceName} | Texto: ${userText.substring(0, 30)}`);
 
-  // 1. Match exato por JID (Telefone ou ID completo)
-  // Tenta encontrar pelo JID completo (@s.whatsapp.net) ou pelo número puro (como salvo na landing page)
-  let { data: lead, error: matchError } = await supabase
+  // 1. Match exato por JID
+  let { data: lead } = await supabase
     .from('leads')
     .select('*, agent_state(*)')
-    .or(`phone.eq.${jid},phone.eq.${numeric}`)
+    .eq('phone', jid)
     .maybeSingle();
 
-  if (matchError) {
-    console.error(`[whatsapp] Erro ao buscar lead por JID ou número (${jid}/${numeric}):`, matchError.message);
-  }
-
-  if (lead) {
-    console.log(`[whatsapp] Lead encontrado: ${lead.name || 'Sem nome'} (ID: ${lead.id}) | Match: ${lead.phone === jid ? 'JID' : 'Numérico'}`);
-    // Se encontrou por numérico, atualiza para JID para acelerar próximos matches
-    if (lead.phone === numeric && !isLid) {
-       await supabase.from('leads').update({ phone: jid }).eq('id', lead.id);
-    }
-  }
-
-  // 2. Match numérico inteligente — APENAS para números reais
-  if (!lead && !isLid && numeric.length >= 10) {
-    console.log(`[whatsapp] Match exato não encontrado para ${jid}. Tentando variações...`);
-    
-    // Lista de variações para busca (com/sem 55, com/sem o 9 extra)
-    let searchNumbers = [numeric];
-    
-    // Se for brasileiro (55xxx...)
-    if (numeric.startsWith('55')) {
-      if (numeric.length === 13) {
-        // Tem o 9 extra, adiciona versão SEM o 9: 55 + DDD + Resto
-        searchNumbers.push(numeric.substring(0, 4) + numeric.substring(5));
-      } else if (numeric.length === 12) {
-        // NÃO tem o 9, adiciona versão COM o 9: 55 + DDD + 9 + Resto
-        searchNumbers.push(numeric.substring(0, 4) + '9' + numeric.substring(4));
-      }
-      
-      // Adiciona também versão sem o DDI 55 (apenas DDD + número)
-      searchNumbers.push(numeric.substring(2)); 
-    }
-
-    const { data: fuzzyLeads, error: fuzzyError } = await supabase
-      .from('leads')
-      .select('*, agent_state(*)')
-      .in('phone', searchNumbers);
-
-    if (fuzzyError) {
-      console.error('[whatsapp] Erro na busca numérica fuzzy:', fuzzyError.message);
-    }
-
-    if (fuzzyLeads && fuzzyLeads.length > 0) {
-      lead = fuzzyLeads[0];
-      console.log(`[whatsapp] Lead encontrado via busca numérica: ${lead.name} (ID: ${lead.id})`);
-      // Atualiza o JID oficial no banco para futuras consultas serem rápidas
-      await supabase.from('leads').update({ phone: jid }).eq('id', lead.id);
-    } else {
-      console.log(`[whatsapp] Nenhuma das variações funcionou: ${searchNumbers.join(', ')}`);
-    }
-  }
-
+  // 2. Match numérico — APENAS para @s.whatsapp.net (ou extraído de @lid via normalizeJid)
   if (!lead) {
-    console.warn(`[whatsapp] Lead não identificado para o JID: ${jid}. Mensagem ignorada.`);
-    return;
+    if (numeric.length >= 10) {
+      const { data: leadByNumbers } = await supabase
+        .from('leads')
+        .select('*, agent_state(*)')
+        .eq('phone', numeric)
+        .maybeSingle();
+      
+      if (leadByNumbers) {
+        lead = leadByNumbers;
+        console.log(`[whatsapp] Vinculando JID ${jid} ao lead numérico ${numeric}`);
+        await supabase.from('leads').update({ phone: jid }).eq('id', lead.id);
+      }
+    }
   }
 
-  // 3. Match por LID salvo em metadata
+  // 3. Match por LID salvo em metadata.known_lids
   if (!lead && isLid) {
     const { data: leadByLid } = await supabase
       .from('leads')
@@ -266,7 +239,6 @@ async function processMessage(jid: string, userText: string, instanceName?: stri
 
   // 4. Se não é @lid, busca em metadata.known_numbers
   if (!lead && !isLid) {
-    const numeric = jid.replace(/\D/g, '');
     if (numeric.length >= 10) {
       const { data: leadByMeta } = await supabase
         .from('leads')
@@ -281,48 +253,13 @@ async function processMessage(jid: string, userText: string, instanceName?: stri
     }
   }
 
-  // 5. HEURÍSTICA PARA @lid SEM MATCH:
-  //    Quando a primeira resposta de um lead da landing page chega como @lid,
-  //    ainda não há mapeamento. Buscamos um lead da landing page criado nas
-  //    últimas 48h que ainda não recebeu nenhuma mensagem do usuário
-  //    (apenas a mensagem de boas-vindas foi enviada pelo agente).
-  if (!lead && isLid) {
-    const since = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
-    const { data: candidateLeads } = await supabase
-      .from('leads')
-      .select('id, name, phone, stage_id, score, notes, metadata, source, agent_state!inner(spin_phase, spin_data, follow_up_count)')
-      .not('phone', 'like', '%@lid%')  // excluir leads que já são @lid
-      .gte('created_at', since)
-      .order('created_at', { ascending: false });
-
-    // Filtra candidatos sem nenhuma mensagem de usuário ainda
-    const awaitingReply = (candidateLeads ?? []).filter(cl => {
-      const followUp = (cl as any).agent_state?.[0]?.follow_up_count ?? 0;
-      return followUp <= 1; // apenas a mensagem de boas-vindas foi enviada
-    });
-
-    if (awaitingReply.length === 1) {
-      lead = awaitingReply[0];
-      console.log(`[whatsapp] @lid ${jid} vinculado à landing page lead ${lead.id} (heurística)`);
-      // Salva o LID nos metadados para futuros matches
-      const currentMeta = (lead as any).metadata || {};
-      const knownLids   = currentMeta.known_lids || [];
-      if (!knownLids.includes(jid)) {
-        await supabase.from('leads')
-          .update({ metadata: { ...currentMeta, known_lids: [...knownLids, jid] } })
-          .eq('id', lead.id);
-      }
-    } else if (awaitingReply.length > 1) {
-      console.warn(`[whatsapp] @lid ${jid}: ${awaitingReply.length} candidatos — não é possível determinar o lead correto automaticamente.`);
-    }
-  }
-
   if (!lead) {
-    console.log(`[whatsapp] Lead não identificado para o JID: ${jid}. Mensagem ignorada conforme política de segurança (apenas contatos cadastrados).`);
+    console.warn(`[whatsapp] Lead NÃO IDENTIFICADO para: ${numeric}. (JID: ${jid}). Ignorando mensagem.`);
     return;
   }
 
   const leadId     = lead.id;
+  console.log(`[whatsapp] Lead ID: ${leadId} pronto para processamento.`);
   const oldStage   = lead.stage_id ?? STAGES.PRIMEIRO_CONTATO;
   const agentState = (lead.agent_state?.[0] || lead.agent_state) ?? {
     spin_phase: 'agendamento',
@@ -370,29 +307,29 @@ async function processMessage(jid: string, userText: string, instanceName?: stri
   if (availability && availability.length > 0) {
     const daysMap = ['Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado'];
     const nowLocal = new Date(new Date().toLocaleString("en-US", { timeZone: "America/Sao_Paulo" }));
-    
+
     // Lista os próximos 14 dias para dar opções ao lead
     for (let i = 1; i <= 14; i++) {
-        const d = new Date(nowLocal);
-        d.setDate(d.getDate() + i);
-        
-        const dayOfWeek = d.getDay();
-        const dateISO = d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, '0') + "-" + String(d.getDate()).padStart(2, '0');
-        const dateStr = d.toLocaleDateString('pt-BR', { timeZone: "America/Sao_Paulo" });
+      const d = new Date(nowLocal);
+      d.setDate(d.getDate() + i);
 
-        // Procura slots fixos dessa data específica primeiro
-        let availableSlots = availability.filter((a: any) => a.specific_date === dateISO);
-        
-        // Se não tiver data específica, pega regra semanal
-        if (availableSlots.length === 0) {
-            availableSlots = availability.filter((a: any) => a.day_of_week === dayOfWeek && !a.specific_date);
-        }
+      const dayOfWeek = d.getDay();
+      const dateISO = d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, '0') + "-" + String(d.getDate()).padStart(2, '0');
+      const dateStr = d.toLocaleDateString('pt-BR', { timeZone: "America/Sao_Paulo" });
 
-        if (availableSlots.length > 0) {
-            for (const slot of availableSlots) {
-                availabilityStr += `${daysMap[dayOfWeek]} (${dateStr}) das ${slot.start_time.substring(0, 5)} às ${slot.end_time.substring(0, 5)}\n`;
-            }
+      // Procura slots fixos dessa data específica primeiro
+      let availableSlots = availability.filter((a: any) => a.specific_date === dateISO);
+
+      // Se não tiver data específica, pega regra semanal
+      if (availableSlots.length === 0) {
+        availableSlots = availability.filter((a: any) => a.day_of_week === dayOfWeek && !a.specific_date);
+      }
+
+      if (availableSlots.length > 0) {
+        for (const slot of availableSlots) {
+          availabilityStr += `${daysMap[dayOfWeek]} (${dateStr}) das ${slot.start_time.substring(0, 5)} às ${slot.end_time.substring(0, 5)}\n`;
         }
+      }
     }
   }
 
@@ -419,60 +356,60 @@ async function processMessage(jid: string, userText: string, instanceName?: stri
   // ── Trata agendamento via JSON ou fallback ───────────────
   let reply = rawReply;
   if (schedule && schedule.action === 'book' && schedule.time) {
-      // Se a IA decidiu agendar um horário
-      const parsedDate = new Date(schedule.time + ":00-03:00"); // Offset BR
+    // Se a IA decidiu agendar um horário
+    const parsedDate = new Date(schedule.time + ":00-03:00"); // Offset BR
 
-      // Gera link Jitsi único (sem API key)
-      const meetingId  = crypto.randomUUID();
-      const meetSlug   = `PontoZero-${meetingId.replace(/-/g, '').substring(0, 10).toUpperCase()}`;
-      const meetLink   = `https://meet.jit.si/${meetSlug}`;
+    // Gera link Jitsi único (sem API key)
+    const meetingId = crypto.randomUUID();
+    const meetSlug = `PontoZero-${meetingId.replace(/-/g, '').substring(0, 10).toUpperCase()}`;
+    const meetLink = `https://meet.jit.si/${meetSlug}`;
 
-      await supabase.from('meetings').insert({
-        id: meetingId,
-        lead_id: leadId,
-        scheduled_start: parsedDate.toISOString(),
-        meet_link: meetLink,
-        status: 'scheduled',
-      });
+    await supabase.from('meetings').insert({
+      id: meetingId,
+      lead_id: leadId,
+      scheduled_start: parsedDate.toISOString(),
+      meet_link: meetLink,
+      status: 'scheduled',
+    });
 
-      console.log(`[calendar] Agendamento confirmado para lead ${leadId} em ${parsedDate.toISOString()} | Link: ${meetLink}`);
+    console.log(`[calendar] Agendamento confirmado para lead ${leadId} em ${parsedDate.toISOString()} | Link: ${meetLink}`);
 
-      // Trunca a mensagem do LLM se houver [REUNIÃO_AGENDADA_AQUI] e substitui
-      if (reply.includes('[REUNIÃO_AGENDADA_AQUI]')) {
-         reply = reply.replace('[REUNIÃO_AGENDADA_AQUI]', `\nLink da Reunião: ${meetLink}\n`);
+    // Trunca a mensagem do LLM se houver [REUNIÃO_AGENDADA_AQUI] e substitui
+    if (reply.includes('[REUNIÃO_AGENDADA_AQUI]')) {
+      reply = reply.replace('[REUNIÃO_AGENDADA_AQUI]', `\nLink da Reunião: ${meetLink}\n`);
+    }
+
+    // ── Notifica o consultor imediatamente sobre o novo agendamento
+    console.log(`[calendar] Verificando consultant_phone para notificação: ${settings?.consultant_phone}`);
+    if (settings?.consultant_phone) {
+      try {
+        const leadName = lead.name || jid.split('@')[0];
+        const localDate = parsedDate.toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' });
+        const consultMsg = `🔔 *Nova Reunião Agendada!*\n\nO lead *${leadName}* acabou de confirmar uma reunião com a IA.\n\n📅 *Data:* ${localDate}\n🔗 *Link Jitsi:* ${meetLink}\n\nEntre no link no horário marcado!`;
+        await sendWhatsApp(settings.consultant_phone, consultMsg);
+        console.log(`[calendar] Notificação enviada ao consultor ${settings.consultant_phone} sobre o agendamento do lead ${leadId}`);
+      } catch (e) {
+        console.error(`[calendar] Erro ao notificar consultor sobre a reunião do lead ${leadId}:`, e);
       }
+    }
 
-      // ── Notifica o consultor imediatamente sobre o novo agendamento
-      console.log(`[calendar] Verificando consultant_phone para notificação: ${settings?.consultant_phone}`);
+  } else if (schedule && schedule.action === 'cancel') {
+    console.log(`[calendar] Lead ${leadId} solicitou cancelamento da reunião.`);
+    // Vamos procurar reuniões agendadas pendentes
+    const { data: activeMeetings } = await supabase.from('meetings').select('*').eq('lead_id', leadId).eq('status', 'scheduled');
+    if (activeMeetings && activeMeetings.length > 0) {
+      // Marca como cancelled
+      await supabase.from('meetings').update({ status: 'cancelled' }).in('id', activeMeetings.map(m => m.id));
+      console.log(`[calendar] Canceladas ${activeMeetings.length} reuniões do lead ${leadId}`);
+      // Também vamos notificar o consultor se for possível
       if (settings?.consultant_phone) {
         try {
           const leadName = lead.name || jid.split('@')[0];
-          const localDate = parsedDate.toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' });
-          const consultMsg = `🔔 *Nova Reunião Agendada!*\n\nO lead *${leadName}* acabou de confirmar uma reunião com a IA.\n\n📅 *Data:* ${localDate}\n🔗 *Link Jitsi:* ${meetLink}\n\nEntre no link no horário marcado!`;
-          await sendWhatsApp(settings.consultant_phone, consultMsg);
-          console.log(`[calendar] Notificação enviada ao consultor ${settings.consultant_phone} sobre o agendamento do lead ${leadId}`);
-        } catch (e) {
-          console.error(`[calendar] Erro ao notificar consultor sobre a reunião do lead ${leadId}:`, e);
-        }
+          const consultCancelMsg = `⚠️ *Reunião Cancelada!*\nO lead *${leadName}* acabou de desmarcar a reunião via IA.`;
+          await sendWhatsApp(settings.consultant_phone, consultCancelMsg);
+        } catch (e) { }
       }
-
-  } else if (schedule && schedule.action === 'cancel') {
-     console.log(`[calendar] Lead ${leadId} solicitou cancelamento da reunião.`);
-     // Vamos procurar reuniões agendadas pendentes
-     const { data: activeMeetings } = await supabase.from('meetings').select('*').eq('lead_id', leadId).eq('status', 'scheduled');
-     if (activeMeetings && activeMeetings.length > 0) {
-        // Marca como cancelled
-        await supabase.from('meetings').update({ status: 'cancelled' }).in('id', activeMeetings.map(m => m.id));
-        console.log(`[calendar] Canceladas ${activeMeetings.length} reuniões do lead ${leadId}`);
-        // Também vamos notificar o consultor se for possível
-        if (settings?.consultant_phone) {
-           try {
-             const leadName = lead.name || jid.split('@')[0];
-             const consultCancelMsg = `⚠️ *Reunião Cancelada!*\nO lead *${leadName}* acabou de desmarcar a reunião via IA.`;
-             await sendWhatsApp(settings.consultant_phone, consultCancelMsg);
-           } catch (e) {}
-        }
-     }
+    }
   } else {
     // Fallback: Injeta link de agendamento se agente usou a tag genérica ao longo do papo
     const BOOKING_URL = Deno.env.get('GOOGLE_CALENDAR_BOOKING_URL') || 'https://calendar.app.google/SG2KftSo31iS7DJy5';
@@ -504,9 +441,9 @@ async function processMessage(jid: string, userText: string, instanceName?: stri
 
   // ── Atualiza estado do agente (Upsert garante que o estado exista) ──
   const { error: upsertError } = await supabase.from('agent_state').upsert({
-    lead_id:         leadId,
-    spin_phase:      newPhase,
-    spin_data:       { ...agentState.spin_data, ...spinData },
+    lead_id: leadId,
+    spin_phase: newPhase,
+    spin_data: { ...agentState.spin_data, ...spinData },
     last_message_at: new Date().toISOString(),
     follow_up_count: (agentState.follow_up_count ?? 0) + 1,
   }, { onConflict: 'lead_id' });
@@ -551,8 +488,8 @@ async function processMessage(jid: string, userText: string, instanceName?: stri
 
   // Verifica se o agente está ativo (Pode ser desativado via CRM)
   if (agentState.is_active === false) {
-     console.log(`[whatsapp] Agente desativado para o lead ${lead.id}. Ignorando resposta.`);
-     return;
+    console.log(`[whatsapp] Agente desativado para o lead ${lead.id}. Ignorando resposta.`);
+    return;
   }
 
   console.log(`[whatsapp] Respondendo para: ${sendTo} (Original: ${jid}) via instância: ${instanceName}`);

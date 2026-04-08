@@ -60,6 +60,7 @@ serve(async (req) => {
     }
 
     // ── Verifica se lead já existe ──────────────────────────
+    // Busca apenas pelo número puro conforme definido no schema.sql
     const { data: existing } = await supabase
       .from('leads')
       .select('id, name')
