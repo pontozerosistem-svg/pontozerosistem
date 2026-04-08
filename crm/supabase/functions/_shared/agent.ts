@@ -245,11 +245,18 @@ export async function generateAgentReply(
 
     let parsed: Record<string, unknown>;
     try {
-      const clean = rawText.replace(/(```json|```)/g, '').trim();
+      let clean = rawText.replace(/(```json|```)/g, '').trim();
+      // Extrai apenas o objeto JSON caso a IA envie texto solto junto
+      const jsonMatch = clean.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+         clean = jsonMatch[0];
+      }
       parsed = JSON.parse(clean);
     } catch {
+      console.warn('[agent] Falha ao fazer parse do JSON bruto. Usando rawText inteiro como fallback.');
       parsed = { reply: rawText };
     }
+
 
     const score     = Number(parsed.score ?? 0);
     const phase     = String(parsed.phase ?? state.phase);

@@ -295,7 +295,7 @@ async function processMessage(jid: string, userText: string, instanceName?: stri
   }
 
   // ── Verifica configurações do agente (Global e por Lead) ────────
-  const { data: settings } = await supabase.from('scheduling_settings').select('agent_enabled').maybeSingle();
+  const { data: settings } = await supabase.from('scheduling_settings').select('*').maybeSingle();
   if ((settings && settings.agent_enabled === false) || agentState.is_active === false) {
     console.log(`[whatsapp] Agente desabilitado (Global: ${settings?.agent_enabled}, Lead: ${agentState.is_active}). Ignorando resposta para ${jid}.`);
     return new Response('ok', { status: 200 });
@@ -377,6 +377,9 @@ async function processMessage(jid: string, userText: string, instanceName?: stri
     // Trunca a mensagem do LLM se houver [REUNIÃO_AGENDADA_AQUI] e substitui
     if (reply.includes('[REUNIÃO_AGENDADA_AQUI]')) {
       reply = reply.replace('[REUNIÃO_AGENDADA_AQUI]', `\nLink da Reunião: ${meetLink}\n`);
+    } else {
+      // Se a IA esqueceu a tag, forçamos o link no final da mensagem
+      reply += `\n\nLink da Reunião: ${meetLink}`;
     }
 
     // ── Notifica o consultor imediatamente sobre o novo agendamento
@@ -492,6 +495,9 @@ async function processMessage(jid: string, userText: string, instanceName?: stri
     return;
   }
 
+  // Formata o texto Markdown (**) para o negrito nativo do WhatsApp (*)
+  const formattedReply = reply.replace(/\*\*/g, '*');
+
   console.log(`[whatsapp] Respondendo para: ${sendTo} (Original: ${jid}) via instância: ${instanceName}`);
-  await sendWhatsApp(sendTo, reply, instanceName);
+  await sendWhatsApp(sendTo, formattedReply, instanceName);
 }
