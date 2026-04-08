@@ -57,9 +57,9 @@ serve(async () => {
     const now = new Date();
 
     for (const m of meetings) {
-      if (!m.scheduled_start) continue;
+      if (!m.scheduled_at) continue;
 
-      const scheduledStart = new Date(m.scheduled_start);
+      const scheduledStart = new Date(m.scheduled_at);
       const diffMs         = now.getTime() - scheduledStart.getTime();
       const diffMinutes    = diffMs / (1000 * 60); // positivo = já passou
 
