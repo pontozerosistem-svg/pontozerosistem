@@ -313,33 +313,8 @@ async function processMessage(jid: string, userText: string, instanceName?: stri
   }
 
   if (!lead) {
-    // Lead novo — veio direto pelo WhatsApp (sem passar pela landing page)
-    const { data: newLead } = await supabase
-      .from('leads')
-      .insert({
-        phone:    jid,
-        source:   'whatsapp_inbound',
-        stage_id: STAGES.PRIMEIRO_CONTATO,
-      })
-      .select('id')
-      .single();
-
-    await supabase.from('agent_state').insert({
-      lead_id:    newLead!.id,
-      spin_phase: 'agendamento',
-      spin_data:  {},
-      follow_up_count: 0
-    });
-
-    await logActivity(newLead!.id, 'stage_change', 'Lead criado via WhatsApp direto', null, STAGES.PRIMEIRO_CONTATO);
-
-    lead = {
-      ...newLead,
-      stage_id:    STAGES.PRIMEIRO_CONTATO,
-      agent_state: [{ spin_phase: 'agendamento', spin_data: {}, follow_up_count: 0 }],
-    };
-
-    console.log(`[whatsapp] Novo lead criado via WhatsApp direto: ${jid}`);
+    console.log(`[whatsapp] Lead não identificado para o JID: ${jid}. Mensagem ignorada conforme política de segurança (apenas contatos cadastrados).`);
+    return;
   }
 
   const leadId     = lead.id;
