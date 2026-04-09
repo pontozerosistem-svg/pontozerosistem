@@ -478,7 +478,7 @@ async function processMessage(jid: string, userText: string, instanceName?: stri
   const { error: upsertError } = await supabase.from('agent_state').upsert({
     lead_id: leadId,
     spin_phase: newPhase,
-    spin_data: { ...agentState.spin_data, ...spinData },
+    spin_data: { ...agentState.spin_data, ...spinData, silence_followup_sent: false },
     last_message_at: new Date().toISOString(),
     follow_up_count: (agentState.follow_up_count ?? 0) + 1,
   }, { onConflict: 'lead_id' });
