@@ -365,16 +365,16 @@ async function processMessage(jid: string, userText: string, instanceName?: stri
   // ── Trata agendamento via JSON ou fallback ───────────────
   let reply = rawReply;
   if (schedule && schedule.action === 'book' && schedule.time) {
-    // Tenta fazer o parse da data normalmente (escrúpulo: "2026-04-15 19:00")
-    let parsedDate = new Date(schedule.time + ":00-03:00"); // Offset BR
+    // Substitui espaco por T caso a IA envie "2026-04-13 08:00" sem o T
+    let safeTime = schedule.time.trim().replace(' ', 'T');
+    let parsedDate = new Date(safeTime + ":00-03:00"); // Offset BR
 
-    // Tenta arrumar a data se a IA mandou algo "quebrado" como "15/04 19:00" em vez de "2026-04-15 19:00"
+    // Tenta arrumar a data se a IA mandou com barras: "15/04/2026 19:00" ou "15/04 19:00"
     if (isNaN(parsedDate.getTime()) && schedule.time.includes('/')) {
         const [datePart, timePart] = schedule.time.split(' ');
         if (datePart && timePart) {
-            const [DD, MM] = datePart.split('/');
-            const year = new Date().getFullYear();
-            // Refaz o parse com padrão ISO aceitável
+            const [DD, MM, YYYY] = datePart.split('/');
+            const year = (YYYY && YYYY.length === 4) ? YYYY : new Date().getFullYear();
             parsedDate = new Date(`${year}-${MM}-${DD}T${timePart}:00-03:00`);
         }
     }
