@@ -154,7 +154,8 @@ async function triggerFirstMessage(leadId: string, phone: string, name?: string)
   // Atualiza estado do agente
   const updates: any = { 
     last_message_at: new Date().toISOString(),
-    follow_up_count: 1
+    follow_up_count: 1,
+    spin_data: { silence_followup_sent: false }
   };
   
   await supabase.from('agent_state')

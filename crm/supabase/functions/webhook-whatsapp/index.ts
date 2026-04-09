@@ -475,10 +475,14 @@ async function processMessage(jid: string, userText: string, instanceName?: stri
   }
 
   // ── Atualiza estado do agente (Upsert garante que o estado exista) ──
+  // Só resetamos a flag de silêncio se for uma mensagem REAL do usuário (não o gatilho [SISTEMA])
+  const isSystemTrigger = userText.startsWith('[SISTEMA]');
+  const newSilenceFlag = isSystemTrigger ? (agentState.spin_data?.silence_followup_sent ?? false) : false;
+
   const { error: upsertError } = await supabase.from('agent_state').upsert({
     lead_id: leadId,
     spin_phase: newPhase,
-    spin_data: { ...agentState.spin_data, ...spinData, silence_followup_sent: false },
+    spin_data: { ...agentState.spin_data, ...spinData, silence_followup_sent: newSilenceFlag },
     last_message_at: new Date().toISOString(),
     follow_up_count: (agentState.follow_up_count ?? 0) + 1,
   }, { onConflict: 'lead_id' });
