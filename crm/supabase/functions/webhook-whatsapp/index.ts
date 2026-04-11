@@ -301,12 +301,18 @@ async function processMessage(jid: string, userText: string, instanceName?: stri
     return new Response('ok', { status: 200 });
   }
 
-  // ── Busca disponibilidade do profissional ───────────────
+  // ── Busca disponibilidade do profissional e conflitos ───
   const { data: availability } = await supabase.from('professional_availability').select('*');
+  const { data: booked } = await supabase.from('meetings')
+    .select('scheduled_at')
+    .in('status', ['scheduled', 'proposed'])
+    .gte('scheduled_at', new Date().toISOString());
+
   let availabilityStr = "";
   if (availability && availability.length > 0) {
     const daysMap = ['Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado'];
     const nowLocal = new Date(new Date().toLocaleString("en-US", { timeZone: "America/Sao_Paulo" }));
+    const bookedTimes = (booked ?? []).map(m => new Date(m.scheduled_at).toISOString());
 
     // Lista os próximos 14 dias para dar opções ao lead
     for (let i = 0; i <= 14; i++) {
@@ -317,26 +323,43 @@ async function processMessage(jid: string, userText: string, instanceName?: stri
       const dateISO = d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, '0') + "-" + String(d.getDate()).padStart(2, '0');
       const dateStr = d.toLocaleDateString('pt-BR', { timeZone: "America/Sao_Paulo" });
 
-      // Procura slots fixos dessa data específica primeiro
-      let availableSlots = availability.filter((a: any) => a.specific_date === dateISO);
-
-      // Se não tiver data específica, pega regra semanal
-      if (availableSlots.length === 0) {
-        availableSlots = availability.filter((a: any) => a.day_of_week === dayOfWeek && !a.specific_date);
+      // Procura slots dessa data específica ou regra semanal
+      let rules = availability.filter((a: any) => a.specific_date === dateISO);
+      if (rules.length === 0) {
+        rules = availability.filter((a: any) => a.day_of_week === dayOfWeek && !a.specific_date);
       }
 
-      if (availableSlots.length > 0) {
-        for (const slot of availableSlots) {
-          // Se for hoje, filtra os horários que já passaram
-          if (i === 0) {
-            const currentHour = nowLocal.getHours();
-            const currentMinute = nowLocal.getMinutes();
-            const [slotHour, slotMinute] = slot.start_time.split(':').map(Number);
-            if (slotHour < currentHour || (slotHour === currentHour && slotMinute <= currentMinute)) {
-              continue; // Ignora slots passados hoje
+      if (rules.length > 0) {
+        let dayHeaderAdded = false;
+        
+        for (const rule of rules) {
+          const [startH, startM] = rule.start_time.split(':').map(Number);
+          const [endH, endM] = rule.end_time.split(':').map(Number);
+          
+          // Quebra intervalos em slots de 1 hora
+          for (let h = startH; h < endH; h++) {
+            const slotDate = new Date(d);
+            slotDate.setHours(h, startM, 0, 0);
+            
+            // 1. Verifica se o slot está no passado ou muito próximo (antecedência min 1h)
+            if (slotDate.getTime() < nowLocal.getTime() + (60 * 60 * 1000)) {
+              continue;
             }
+
+            // 2. Verifica colisão com reuniões já marcadas
+            if (bookedTimes.includes(slotDate.toISOString())) {
+              continue;
+            }
+
+            if (!dayHeaderAdded) {
+              const label = i === 0 ? "HOJE" : i === 1 ? "AMANHÃ" : daysMap[dayOfWeek];
+              availabilityStr += `\n📅 *${label} (${dateStr})*:\n`;
+              dayHeaderAdded = true;
+            }
+            
+            const timeFormatted = String(h).padStart(2, '0') + ":" + String(startM).padStart(2, '0');
+            availabilityStr += `- ${timeFormatted}\n`;
           }
-          availabilityStr += `${daysMap[dayOfWeek]} (${dateStr}) das ${slot.start_time.substring(0, 5)} às ${slot.end_time.substring(0, 5)}\n`;
         }
       }
     }

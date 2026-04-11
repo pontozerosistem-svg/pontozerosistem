@@ -31,7 +31,7 @@ async function addMeeting() {
   const { error: insertErr } = await supabase.from('meetings').insert({
     id: meetingId,
     lead_id: luiza.id,
-    scheduled_start: parsedDate.toISOString(),
+    scheduled_at: parsedDate.toISOString(),
     meet_link: meetLink,
     status: 'scheduled',
   });
