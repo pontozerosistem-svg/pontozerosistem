@@ -23,6 +23,7 @@ export default function LeadModal({ lead, stages, onClose, onUpdate, onDelete }:
     is_active: lead.is_active ?? true
   })
   const [saving, setSaving] = useState(false)
+  const [togglingAgent, setTogglingAgent] = useState(false)
   const [tab, setTab] = useState<'info' | 'chat'>('info')
   const [confirmingDelete, setConfirmingDelete] = useState(false)
 
@@ -53,7 +54,7 @@ export default function LeadModal({ lead, stages, onClose, onUpdate, onDelete }:
         
       if (!res.error && res.data) {
         // As a new lead is created, webhook or manually we set agent_state. We need to update is_active.
-        await supabase.from('agent_state').update({ is_active: form.is_active }).eq('lead_id', res.data.id)
+        await supabase.from('agent_state').upsert({ lead_id: res.data.id, is_active: form.is_active })
       }
     } else {
       res = await supabase
@@ -64,7 +65,7 @@ export default function LeadModal({ lead, stages, onClose, onUpdate, onDelete }:
         .single()
         
       if (!res.error) {
-         await supabase.from('agent_state').update({ is_active: form.is_active }).eq('lead_id', lead.id)
+         await supabase.from('agent_state').upsert({ lead_id: lead.id, is_active: form.is_active })
       }
     }
     
@@ -75,6 +76,25 @@ export default function LeadModal({ lead, stages, onClose, onUpdate, onDelete }:
       onUpdate({ ...lead, ...res.data, is_active: form.is_active })
       setEditing(false)
       if (isNew) onClose()
+    }
+  }
+
+  async function handleToggleAgent() {
+    if (isNew) return
+    const newState = !form.is_active
+    setTogglingAgent(true)
+    
+    const { error } = await supabase
+      .from('agent_state')
+      .upsert({ lead_id: lead.id, is_active: newState })
+    
+    setTogglingAgent(false)
+    
+    if (error) {
+      alert('Erro ao alterar estado do agente: ' + error.message)
+    } else {
+      setForm(f => ({ ...f, is_active: newState }))
+      onUpdate({ ...lead, is_active: newState })
     }
   }
 
@@ -199,13 +219,13 @@ export default function LeadModal({ lead, stages, onClose, onUpdate, onDelete }:
                 <label>Assistente Virtual (IA)</label>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 4 }}>
                   <div
-                    onClick={() => editing && setForm(f => ({ ...f, is_active: !f.is_active }))}
+                    onClick={handleToggleAgent}
                     style={{
                       width: 40, height: 22, borderRadius: 12, 
                       background: form.is_active ? 'var(--accent)' : 'var(--border)',
                       position: 'relative', transition: 'background 0.2s', 
-                      cursor: editing ? 'pointer' : 'default',
-                      opacity: editing ? 1 : 0.7
+                      cursor: togglingAgent ? 'wait' : 'pointer',
+                      opacity: togglingAgent ? 0.6 : 1
                     }}
                   >
                     <div style={{
@@ -217,7 +237,7 @@ export default function LeadModal({ lead, stages, onClose, onUpdate, onDelete }:
                     }} />
                   </div>
                   <span style={{ fontSize: 13, color: form.is_active ? 'var(--text-primary)' : 'var(--text-muted)' }}>
-                    {form.is_active ? 'Ativo (Respondendo Automático)' : 'Pausado (Apenas Humano)'}
+                    {togglingAgent ? 'Salvando...' : (form.is_active ? 'Ativo (Respondendo Automático)' : 'Pausado (Apenas Humano)')}
                   </span>
                 </div>
               </div>
