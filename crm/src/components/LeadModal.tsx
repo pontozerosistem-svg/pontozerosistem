@@ -54,7 +54,8 @@ export default function LeadModal({ lead, stages, onClose, onUpdate, onDelete }:
         
       if (!res.error && res.data) {
         // As a new lead is created, webhook or manually we set agent_state. We need to update is_active.
-        await supabase.from('agent_state').upsert({ lead_id: res.data.id, is_active: form.is_active })
+        const { error: agErr } = await supabase.from('agent_state').upsert({ lead_id: res.data.id, is_active: form.is_active }, { onConflict: 'lead_id' })
+        if (agErr) console.error('[agent_state upsert] novo lead:', agErr)
       }
     } else {
       res = await supabase
@@ -65,7 +66,8 @@ export default function LeadModal({ lead, stages, onClose, onUpdate, onDelete }:
         .single()
         
       if (!res.error) {
-         await supabase.from('agent_state').upsert({ lead_id: lead.id, is_active: form.is_active })
+        const { error: agErr } = await supabase.from('agent_state').upsert({ lead_id: lead.id, is_active: form.is_active }, { onConflict: 'lead_id' })
+        if (agErr) console.error('[agent_state upsert] editar lead:', agErr)
       }
     }
     
@@ -86,11 +88,12 @@ export default function LeadModal({ lead, stages, onClose, onUpdate, onDelete }:
     
     const { error } = await supabase
       .from('agent_state')
-      .upsert({ lead_id: lead.id, is_active: newState })
+      .upsert({ lead_id: lead.id, is_active: newState }, { onConflict: 'lead_id' })
     
     setTogglingAgent(false)
     
     if (error) {
+      console.error('[agent_state toggle]', error)
       alert('Erro ao alterar estado do agente: ' + error.message)
     } else {
       setForm(f => ({ ...f, is_active: newState }))
