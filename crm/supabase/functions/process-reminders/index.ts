@@ -68,9 +68,10 @@ serve(async () => {
 
       const updates: Record<string, unknown> = {};
 
-      // ── 1. LEMBRETE 30 MIN ANTES ───────────────────────────────────────
-      // diffMinutes entre -35 e 0 (janela: 35 min antes até o horário exato)
-      if (!m.reminder_sent && diffMinutes >= -35 && diffMinutes <= 0) {
+      // ── 1. LEMBRETE ~30 MIN ANTES ─────────────────────────────────────
+      // janela ampliada: 65 min antes até o horário exato
+      // garante que o cron de 5 em 5 min nunca perca a janela
+      if (!m.reminder_sent && diffMinutes >= -65 && diffMinutes <= 0) {
         console.log(`[reminders] Lembrete 30min → lead ${m.lead_id}`);
 
         // Garante que o meet_link já existe (gera se necessário)
