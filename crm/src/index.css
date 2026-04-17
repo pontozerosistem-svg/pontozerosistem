@@ -1,5 +1,9 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
 /* ============================================================
-   CRM — Seu Dinheiro na Mesa
+   CRM — Ponto Zero
    Global Design System
    ============================================================ */
 

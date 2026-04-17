@@ -3,7 +3,25 @@ import { createClient } from '@supabase/supabase-js';
 const supabaseUrl = (import.meta.env.VITE_SUPABASE_URL || 'https://zyuldjccrpmvzlgdxmtk.supabase.co') as string;
 const supabaseAnonKey = (import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp5dWxkamNjcnBtdnpsZ2R4bXRrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ2MTcxMTEsImV4cCI6MjA5MDE5MzExMX0.Zork4rU4pTMAa-2IFXeyzKLEsNP_xdna8VMS4DkDmP8') as string;
 
+console.log('[Supabase] Initializing with URL:', supabaseUrl);
+
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+
+// Adicionado para diagnóstico de conexão
+export const checkSupabaseConnection = async () => {
+  try {
+    const { data, error } = await supabase.from('pipeline_stages').select('count', { count: 'exact', head: true });
+    if (error) {
+      console.error('[Supabase] Connection check failed:', error);
+      return { success: false, message: error.message };
+    }
+    console.log('[Supabase] Connection check successful');
+    return { success: true };
+  } catch (err: any) {
+    console.error('[Supabase] Unexpected connection error:', err);
+    return { success: false, message: err.message };
+  }
+};
 
 export const signOut = async () => {
   const { error } = await supabase.auth.signOut();

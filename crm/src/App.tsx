@@ -8,17 +8,18 @@ export default function App() {
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
-      <Route path="/" element={
+      <Route path="/crm" element={
           <AuthGuard>
             <Dashboard />
           </AuthGuard>
       } />
-      <Route path="/whatsapp" element={
+      <Route path="/crm/whatsapp" element={
           <AuthGuard>
             <WhatsAppSetup />
           </AuthGuard>
       } />
-      <Route path="*" element={<Navigate to="/" replace />} />
+      <Route path="/" element={<Navigate to="/crm" replace />} />
+      <Route path="*" element={<Navigate to="/crm" replace />} />
     </Routes>
   )
 }

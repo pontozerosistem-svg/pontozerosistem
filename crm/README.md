@@ -1,4 +1,4 @@
-# CRM — Seu Dinheiro na Mesa
+# Ponto Zero CRM
 
 Stack: **Supabase Edge Functions** + **OpenAI GPT-4o** + **Evolution API (WhatsApp)** + **React + Vite (Frontend)**
 
