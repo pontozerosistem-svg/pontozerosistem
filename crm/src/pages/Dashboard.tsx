@@ -11,8 +11,14 @@ import SettingsView from '../components/SettingsView'
 import MeetingsView from '../components/MeetingsView'
 
 const STAGES_COLORS: Record<number, string> = {
-  1: '#94a3b8', 2: '#3b82f6', 3: '#f59e0b', 4: '#8b5cf6',
-  5: '#22c55e', 6: '#ef4444'
+  1: '#94a3b8', // Novo Lead
+  2: '#3b82f6', // Primeiro Contato
+  3: '#f59e0b', // Qualificação
+  4: '#8b5cf6', // Apresentação
+  5: '#ec4899', // Proposta Enviada
+  6: '#f97316', // Negociação
+  7: '#22c55e', // Ganho
+  8: '#ef4444'  // Perdido
 }
 
 export default function Dashboard() {

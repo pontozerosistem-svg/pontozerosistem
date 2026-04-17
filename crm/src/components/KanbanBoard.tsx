@@ -37,10 +37,10 @@ export default function KanbanBoard({ stages, leads, onLeadClick, onStageChange 
             onDrop={(e) => handleDrop(e, stage.id)}
           >
             {/* Column header */}
-            <div className="kanban-col-header">
-              <div className="col-dot" style={{ background: stage.color }} />
+            <div className="kanban-col-header" style={{ borderBottom: `2px solid ${stage.color || '#6366f1'}` }}>
+              <div className="col-dot" style={{ background: stage.color || '#6366f1' }} />
               <span className="col-name">{stage.name}</span>
-              <span className="col-count" style={{ background: `${stage.color}20`, color: stage.color }}>
+              <span className="col-count" style={{ background: `${stage.color || '#6366f1'}30`, color: stage.color || '#6366f1', border: `1px solid ${stage.color || '#6366f1'}50` }}>
                 {stageLeads.length}
               </span>
             </div>
@@ -78,13 +78,13 @@ export default function KanbanBoard({ stages, leads, onLeadClick, onStageChange 
         }
         .kanban-col {
           flex-shrink: 0;
-          width: 240px;
-          background: var(--bg-surface);
-          border: 1px solid var(--border);
+          width: 280px;
+          background: #12121c;
+          border: 1px solid rgba(255,255,255,0.15);
           border-radius: var(--radius-lg);
-          padding: 12px;
+          padding: 16px;
           transition: var(--transition);
-          min-height: 200px;
+          min-height: 500px;
         }
         .kanban-col.drag-over {
           border-color: var(--accent);
