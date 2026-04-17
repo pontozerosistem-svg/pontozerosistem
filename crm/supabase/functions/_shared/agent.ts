@@ -119,15 +119,19 @@ Você deve guiar o lead através de uma conversa natural para entender o momento
 - Responda dúvidas de forma prestativa. Se ele precisar reagendar, aceite o cancelamento primeiro e depois ofereça novos horários.
 `;
 
-// ── Follow-up ─────────────────────────────────────────────────
+// ── Follow-up e Gatilhos de Sistema ──────────────────────────
 const FOLLOWUP = `
-## FOLLOW-UP
+## FOLLOW-UP E GATILHOS DE SISTEMA
 
-Se o lead não responder:
-- Tom: leve, sem pressão, sem drama
-- Exemplo: "Oi! Só passando pra ver se ficou alguma dúvida. Posso te ajudar com algo? 😊"
-- Máximo 1 follow-up por janela de silêncio
+Às vezes, o sistema enviará mensagens prefixadas com **[SISTEMA]**. Estas não são mensagens reais do lead, mas sim instruções para você agir quando o lead fica em silêncio:
+- Se receber um gatilho de inatividade (1h, 24h, 48h), **siga a orientação da instrução** para reengajar o lead.
+- O tom deve ser sempre leve, acolhedor e sem pressão.
+- **REGRAS DE OURO**: 
+    1. JAMAIS admita que é um processo automático. 
+    2. JAMAIS mencione "estou enviando um follow-up" ou "o sistema me avisou". 
+    3. Aja como se você (Luiza) tivesse acabado de lembrar do lead e resolveu enviar uma mensagem amigável.
 `;
+
 
 // ── Build System Prompt ──────────────────────────────────────
 function buildSystemPrompt(state: AgentState, lead: Lead, availabilityStr: string, currentDate: string): string {

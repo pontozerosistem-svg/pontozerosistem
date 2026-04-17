@@ -498,17 +498,23 @@ async function processMessage(jid: string, userText: string, instanceName?: stri
   }
 
   // ── Atualiza estado do agente (Upsert garante que o estado exista) ──
-  // Só resetamos a flag de silêncio se for uma mensagem REAL do usuário (não o gatilho [SISTEMA])
+  // Só resetamos as flags de follow-up se for uma mensagem REAL do usuário (não o gatilho [SISTEMA])
   const isSystemTrigger = userText.startsWith('[SISTEMA]');
-  const newSilenceFlag = isSystemTrigger ? (agentState.spin_data?.silence_followup_sent ?? false) : false;
+  const updatedSpinData = { ...agentState.spin_data, ...spinData };
+  
+  if (!isSystemTrigger) {
+    updatedSpinData.follow_up_level = 0;
+    updatedSpinData.silence_followup_sent = false;
+  }
 
   const { error: upsertError } = await supabase.from('agent_state').upsert({
     lead_id: leadId,
     spin_phase: newPhase,
-    spin_data: { ...agentState.spin_data, ...spinData, silence_followup_sent: newSilenceFlag },
+    spin_data: updatedSpinData,
     last_message_at: new Date().toISOString(),
     follow_up_count: (agentState.follow_up_count ?? 0) + 1,
   }, { onConflict: 'lead_id' });
+
 
   if (upsertError) {
     console.error(`[whatsapp] Erro ao dar upsert no agent_state: ${upsertError.message}`);
