@@ -93,51 +93,21 @@ serve(async (req) => {
       return new Response('ok', { status: 200 });
     }
 
-    const audioMsg = msg?.audioMessage;
-
-    if (audioMsg && messageId && jid) {
-      console.log(`[whatsapp] Áudio detectado de ${jid}. Processando em background.`);
-      const audioWork = (async () => {
-        try {
-          await new Promise(resolve => setTimeout(resolve, 2000));
-          const base64 = await getAudioBase64(messageId, jid);
-          if (base64) {
-            const text = await transcribeAudio(base64);
-            if (text) {
-              console.log(`[transcription] ${jid}: ${text}`);
-              await processMessage(jid, `[Áudio]: ${text}`, instanceName);
-            }
-          }
-        } catch (e: any) {
-          console.error('[audio] Erro no processamento:', e.message);
-        }
-      })();
-
-      // Registrar trabalho em background no Edge Runtime
-      // @ts-ignore
-      if (typeof EdgeRuntime !== 'undefined' && EdgeRuntime.waitUntil) {
-        // @ts-ignore
-        EdgeRuntime.waitUntil(audioWork);
-      }
-
-      return new Response('ok', { status: 200 });
-    }
-
     const text =
       msg?.conversation ||
       msg?.extendedTextMessage?.text ||
-      msg?.imageMessage?.caption;
+      msg?.imageMessage?.caption || 
+      (msg?.audioMessage ? '[Processando Áudio...]' : '');
 
     if (jid && text) {
-      // IMPORTANTE: Await aqui para garantir que a função não feche prematuramente
-      console.log(`[webhook-whatsapp] Chamando processMessage para ${jid} e AGUARDANDO...`);
+      console.log(`[webhook-whatsapp] Iniciando processamento para ${jid}`);
       await processMessage(jid, text, instanceName);
     }
 
     return new Response('ok', { status: 200 });
 
   } catch (err: any) {
-    console.error('[webhook-whatsapp] Erro crítico no handler:', err.message);
+    console.error('[webhook-whatsapp] Erro crítico:', err.message);
     return new Response('ok', { status: 200 });
   }
 });
@@ -200,61 +170,19 @@ async function processMessage(jid: string, userText: string, instanceName?: stri
 
   console.log(`[whatsapp] Nova mensagem | JID: ${jid} | Instância: ${instanceName} | Texto: ${userText.substring(0, 30)}`);
 
-  // 1. Match exato por JID
-  let { data: lead } = await supabase
+  // --- BUSCA UNIFICADA DE LEAD (Otimização Drástica de Performance) ---
+  const { data: lead, error: findError } = await supabase
     .from('leads')
     .select('*, agent_state(*)')
-    .eq('phone', jid)
+    .or(`phone.eq.${jid},phone.eq.${numeric},metadata->known_lids.cs.["${jid}"],metadata->known_numbers.cs.["${numeric}"]`)
     .maybeSingle();
 
-  // 2. Match numérico — APENAS para @s.whatsapp.net (ou extraído de @lid via normalizeJid)
-  if (!lead) {
-    if (numeric.length >= 10) {
-      const { data: leadByNumbers } = await supabase
-        .from('leads')
-        .select('*, agent_state(*)')
-        .eq('phone', numeric)
-        .maybeSingle();
-      
-      if (leadByNumbers) {
-        lead = leadByNumbers;
-        console.log(`[whatsapp] Vinculando JID ${jid} ao lead numérico ${numeric}`);
-        await supabase.from('leads').update({ phone: jid }).eq('id', lead.id);
-      }
-    }
-  }
-
-  // 3. Match por LID salvo em metadata.known_lids
-  if (!lead && isLid) {
-    const { data: leadByLid } = await supabase
-      .from('leads')
-      .select('*, agent_state(*)')
-      .contains('metadata', { known_lids: [jid] })
-      .maybeSingle();
-    if (leadByLid) {
-      lead = leadByLid;
-      console.log(`[whatsapp] Lead encontrado via metadata known_lids: ${jid}`);
-    }
-  }
-
-  // 4. Se não é @lid, busca em metadata.known_numbers
-  if (!lead && !isLid) {
-    if (numeric.length >= 10) {
-      const { data: leadByMeta } = await supabase
-        .from('leads')
-        .select('*, agent_state(*)')
-        .contains('metadata', { known_numbers: [numeric] })
-        .maybeSingle();
-      if (leadByMeta) {
-        lead = leadByMeta;
-        console.log(`[whatsapp] Lead encontrado via metadata known_numbers: ${numeric}`);
-        await supabase.from('leads').update({ phone: jid }).eq('id', lead.id);
-      }
-    }
+  if (findError) {
+    console.error('[whatsapp] Erro na busca unificada:', findError.message);
   }
 
   if (!lead) {
-    console.warn(`[whatsapp] Lead NÃO IDENTIFICADO para: ${numeric}. (JID: ${jid}). Ignorando mensagem.`);
+    console.warn(`[whatsapp] Lead NÃO IDENTIFICADO para: ${jid}. Ignorando.`);
     return;
   }
 

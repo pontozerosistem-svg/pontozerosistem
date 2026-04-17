@@ -137,19 +137,10 @@ async function triggerFirstMessage(leadId: string, phone: string, name?: string)
   const fullText = `${msg1}\n\n${msg2}\n\n${msg3}`;
   await saveMessage(leadId, 'assistant', fullText);
   
-  // Envia no Zap separadamente com pequeno atraso para humanizar
+  // Envia no Zap em um único bloco para economizar CPU (Plan NANO)
   let officialJid = null;
-  
-  const jid1 = await sendWhatsApp(phone, msg1);
-  if (jid1) officialJid = jid1;
-  await new Promise(r => setTimeout(r, 1200));
-  
-  const jid2 = await sendWhatsApp(phone, msg2);
-  if (jid2) officialJid = jid2;
-  await new Promise(r => setTimeout(r, 1500));
-  
-  const jid3 = await sendWhatsApp(phone, msg3);
-  if (jid3) officialJid = jid3;
+  const jid = await sendWhatsApp(phone, fullText);
+  if (jid) officialJid = jid;
 
   // Atualiza estado do agente
   const updates: any = { 
