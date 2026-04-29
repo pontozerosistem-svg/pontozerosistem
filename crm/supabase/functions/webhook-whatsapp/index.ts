@@ -12,6 +12,7 @@ import { sendWhatsApp } from '../_shared/evolution.ts';
 import { generateAgentReply } from '../_shared/agent.ts';
 import { STAGES, STAGE_NAMES } from '../_shared/stages.ts';
 import { getAudioBase64, transcribeAudio } from '../_shared/audio.ts';
+import { getAccessToken, createCalendarEvent } from '../_shared/google.ts';
 
 
 
@@ -310,7 +311,7 @@ async function processMessage(jid: string, userText: string, instanceName?: stri
     ...agentState,
     phase: agentState.spin_phase, // mapeia para o novo campo
   };
-  const { reply: rawReply, newPhase, spinData, score, nextStage, notes, schedule } =
+  let { reply: rawReply, newPhase, email: collectedEmail, score, nextStage, notes, schedule } =
     await generateAgentReply(history ?? [], agentInput, lead, availabilityStr);
 
   // ── Trata agendamento via JSON ou fallback ───────────────
@@ -335,16 +336,55 @@ async function processMessage(jid: string, userText: string, instanceName?: stri
         throw new Error("Formato de data inválido gerado pela IA: " + schedule.time);
       }
 
-      // Gera link Jitsi único (sem API key)
-      const meetingId = crypto.randomUUID();
-      const meetSlug = `PontoZero-${meetingId.replace(/-/g, '').substring(0, 10).toUpperCase()}`;
-      const meetLink = `https://meet.jit.si/${meetSlug}`;
+      // ── INTEGRAÇÃO GOOGLE CALENDAR ──
+      let meetLink = '';
+      let googleEventId = '';
+      
+      const leadEmail = collectedEmail || lead.email;
+      const leadName = lead.name || jid.split('@')[0];
+
+      if (leadEmail && settings?.google_refresh_token) {
+        try {
+          console.log(`[google] Iniciando agendamento para ${leadEmail}...`);
+          const accessToken = await getAccessToken({
+            client_id: settings.google_client_id,
+            client_secret: settings.google_client_secret,
+            refresh_token: settings.google_refresh_token
+          });
+
+          const endDate = new Date(parsedDate.getTime() + 60 * 60 * 1000); // 1h de duração
+
+          const event = await createCalendarEvent(accessToken, {
+            summary: `Reunião de Descoberta: ${leadName}`,
+            description: `Reunião agendada automaticamente via Ponto Zero CRM.\n\nLead: ${leadName}\nWhatsApp: ${numeric}`,
+            start: parsedDate.toISOString(),
+            end: endDate.toISOString(),
+            attendeeEmail: leadEmail,
+            attendeeName: leadName
+          });
+
+          meetLink = event.meetLink;
+          googleEventId = event.eventId;
+          console.log(`[google] Evento criado: ${googleEventId} | Link: ${meetLink}`);
+        } catch (gErr: any) {
+          console.error(`[google] Falha na API: ${gErr.message}`);
+          // Fallback para Jitsi se o Google falhar
+        }
+      }
+
+      // Fallback para Jitsi caso o Google não tenha sido configurado ou falhou
+      if (!meetLink) {
+        const meetingId = crypto.randomUUID();
+        const meetSlug = `PontoZero-${meetingId.replace(/-/g, '').substring(0, 10).toUpperCase()}`;
+        meetLink = `https://meet.jit.si/${meetSlug}`;
+        console.log(`[calendar] Fallback para Jitsi: ${meetLink}`);
+      }
 
       const { error: insErr } = await supabase.from('meetings').insert({
-        id: meetingId,
         lead_id: leadId,
         scheduled_at: parsedDate.toISOString(),
         meet_link: meetLink,
+        google_event_id: googleEventId || null,
         status: 'scheduled',
       });
       if (insErr) throw insErr;
@@ -365,7 +405,7 @@ async function processMessage(jid: string, userText: string, instanceName?: stri
         try {
           const leadName = lead.name || jid.split('@')[0];
           const localDate = parsedDate.toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' });
-          const consultMsg = `🔔 *Nova Reunião Agendada!*\n\nO lead *${leadName}* acabou de confirmar uma reunião com a IA.\n\n📅 *Data:* ${localDate}\n🔗 *Link Jitsi:* ${meetLink}\n\nEntre no link no horário marcado!`;
+          const consultMsg = `🔔 *Nova Reunião Agendada!*\n\nO lead *${leadName}* acabou de confirmar uma reunião.\n\n📅 *Data:* ${localDate}\n🔗 *Link:* ${meetLink}\n\nConvite enviado para: ${leadEmail || 'E-mail não informado'}`;
           await sendWhatsApp(settings.consultant_phone, consultMsg);
           console.log(`[calendar] Notificação enviada ao consultor ${settings.consultant_phone} sobre o agendamento`);
         } catch (e) {
@@ -457,9 +497,9 @@ async function processMessage(jid: string, userText: string, instanceName?: stri
 
   // ── Move card no pipeline e Salva Anotações ─────────
   if (nextStage && nextStage !== oldStage) {
-    await supabase.from('leads')
-      .update({ score, stage_id: nextStage, notes: notes || lead.notes })
-      .eq('id', leadId);
+    const updatePayload: any = { score, stage_id: nextStage, notes: notes || lead.notes };
+    if (collectedEmail) updatePayload.email = collectedEmail;
+    await supabase.from('leads').update(updatePayload).eq('id', leadId);
 
     await logActivity(
       leadId,
@@ -472,7 +512,9 @@ async function processMessage(jid: string, userText: string, instanceName?: stri
     console.log(`[pipeline] ${jid}: ${STAGE_NAMES[oldStage]} → ${STAGE_NAMES[nextStage]}`);
   } else {
     // Só atualiza score e notes
-    await supabase.from('leads').update({ score, notes: notes || lead.notes }).eq('id', leadId);
+    const updatePayload: any = { score, notes: notes || lead.notes };
+    if (collectedEmail) updatePayload.email = collectedEmail;
+    await supabase.from('leads').update(updatePayload).eq('id', leadId);
   }
 
   // ── Envia resposta pelo WhatsApp ────────────────────────

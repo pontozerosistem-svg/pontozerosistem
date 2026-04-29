@@ -26,8 +26,7 @@ export interface Lead {
 export interface AgentResult {
   reply: string;
   newPhase: string;
-  spinData: Record<string, unknown>;
-  score: number;
+  email?: string;
   nextStage: number | null;
   notes: string;
   schedule?: ScheduleAction;
@@ -50,6 +49,12 @@ Sua forma de comunicar (como Luiza):
 - Nunca faz mais de uma pergunta por mensagem
 - Máximo 3 parágrafos curtos por mensagem
 - Nunca menciona preços antes da Reunião de Descoberta
+- Nunca use emojis infantis ou excessivos. Acima de tudo: NUNCA USE O EMOJI DE BORBOLETA 🦋 ou similares. Mantenha-se elegante e sóbria.
+
+## COLETA DE DADOS OBRIGATÓRIA
+Para que a reunião seja confirmada e o convite enviado para a agenda, você **PRECISA** ter o **NOME** e o **E-MAIL** do lead.
+1. Se o lead aceitar a reunião, mas você ainda não tiver o e-mail dele, peça educadamente antes de finalizar o agendamento.
+2. Diga que o e-mail é necessário para o Google enviar o convite oficial com o link da sala.
 `;
 
 // ── Serviços ──────────────────────────────────────────────────
@@ -108,7 +113,9 @@ Você deve guiar o lead através de uma conversa natural para entender o momento
     3. Se o lead pedir "outras datas" ou "outros horários", consulte novamente a lista e ofereça opções diferentes das anteriores.
     4. Se o lead escolher um horário que você já mencionou antes, aceite e confirme imediatamente. Não diga que houve mal-entendido.
 - "action": "suggest" para sugerir horários.
-- "action": "book" se o lead escolheu/confirmou um horário. NUNCA diga "Um momento, por favor", "Vou registrar", ou peça para o lead esperar. Responda imediatamente confirmando e se despedindo. O sistema anexará o link da sala à sua mensagem final.
+- "action": "book" se o lead escolheu/confirmou um horário **E você já tem o e-mail dele**. 
+- **IMPORTANTE:** Se o lead escolheu o horário mas você **NÃO** tem o e-mail, NÃO use "book" ainda. Use "none", confirme o horário escolhido e peça o e-mail. Só use "book" na mensagem seguinte, após ele informar o e-mail.
+- Ao usar "book", responda imediatamente confirmando e se despedindo. O sistema enviará o convite para o e-mail dele.
 - "action": "cancel" se o lead pediu para cancelar.
 
 > [!CAUTION]
@@ -190,12 +197,12 @@ Avalie a maturidade do lead com base nas informações compartilhadas e defina o
   "reply": "mensagem para o lead",
   "phase": "agendamento|confirmado",
   "next_stage": 2,
-  "score": "número de 0 a 100 com base na maturidade atual",
-
+  "score": 85,
+  "email": "email@coletado.com",
   "notes": "Resumo objetivo sobre as dúvidas ou a intenção do lead.",
   "schedule": {
-    "action": "none" | "suggest" | "book" | "cancel",
-    "time": "YYYY-MM-DD HH:mm ou null"
+    "action": "book",
+    "time": "YYYY-MM-DD HH:mm"
   }
 }
 
@@ -295,6 +302,7 @@ export async function generateAgentReply(
       reply:    finalReply,
       newPhase: phase,
       spinData: {},
+      email:    parsed.email ? String(parsed.email) : undefined,
       score,
       nextStage,
       notes,
