@@ -311,7 +311,7 @@ async function processMessage(jid: string, userText: string, instanceName?: stri
     ...agentState,
     phase: agentState.spin_phase, // mapeia para o novo campo
   };
-  let { reply: rawReply, newPhase, email: collectedEmail, score, nextStage, notes, schedule } =
+  let { reply: rawReply, newPhase, spinData, name: collectedName, email: collectedEmail, score, nextStage, notes, schedule } =
     await generateAgentReply(history ?? [], agentInput, lead, availabilityStr);
 
   // ── Trata agendamento via JSON ou fallback ───────────────
@@ -491,9 +491,9 @@ async function processMessage(jid: string, userText: string, instanceName?: stri
   }
 
   // ── Atualiza nome do lead se o agente coletou ──────────
-  if ((spinData as any)?.nome && !lead.name) {
+  if (collectedName && !lead.name) {
     await supabase.from('leads')
-      .update({ name: (spinData as any).nome })
+      .update({ name: collectedName })
       .eq('id', leadId);
   }
 

@@ -26,6 +26,7 @@ export interface Lead {
 export interface AgentResult {
   reply: string;
   newPhase: string;
+  name?: string;
   email?: string;
   nextStage: number | null;
   notes: string;
@@ -198,6 +199,7 @@ Avalie a maturidade do lead com base nas informações compartilhadas e defina o
   "phase": "agendamento|confirmado",
   "next_stage": 2,
   "score": 85,
+  "name": "Nome do Lead",
   "email": "email@coletado.com",
   "notes": "Resumo objetivo sobre as dúvidas ou a intenção do lead.",
   "schedule": {
@@ -302,6 +304,7 @@ export async function generateAgentReply(
       reply:    finalReply,
       newPhase: phase,
       spinData: {},
+      name:     parsed.name ? String(parsed.name) : undefined,
       email:    parsed.email ? String(parsed.email) : undefined,
       score,
       nextStage,
