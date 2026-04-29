@@ -166,6 +166,7 @@ function normalizeJid(rawJid: string, event: any, dataObj: any): string {
 // CORE — Processa mensagem recebida
 // ============================================================
 async function processMessage(jid: string, userText: string, instanceName?: string) {
+  try {
   const isLid = jid.includes('@lid');
   const numeric = jid.replace(/\D/g, '');
 
@@ -531,9 +532,15 @@ async function processMessage(jid: string, userText: string, instanceName?: stri
     return;
   }
 
-  // Formata o texto Markdown (**) para o negrito nativo do WhatsApp (*)
-  const formattedReply = reply.replace(/\*\*/g, '*');
+    const formattedReply = reply.replace(/\*\*/g, '*');
+    await sendWhatsApp(sendTo, formattedReply, instanceName);
 
-  console.log(`[whatsapp] Respondendo para: ${sendTo} (Original: ${jid}) via instância: ${instanceName}`);
-  await sendWhatsApp(sendTo, formattedReply, instanceName);
+  } catch (err: any) {
+    console.error(`[CRITICAL ERROR]`, err);
+    // Tenta enviar o erro para o WhatsApp do usuário para debug rápido
+    try {
+      const errorMsg = `🚨 *ERRO NO AGENTE*\n\nDetalhe: ${err.message}\n\nLocal: ${err.stack?.split('\n')[1] || 'desconhecido'}`;
+      await sendWhatsApp(jid, errorMsg, instanceName);
+    } catch (e) {}
+  }
 }

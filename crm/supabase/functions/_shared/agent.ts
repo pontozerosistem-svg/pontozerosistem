@@ -227,12 +227,12 @@ export async function generateAgentReply(
   // Use timezone de São Paulo para formatar a data que vai pro agente
   const now = new Date();
   const currentDate = new Intl.DateTimeFormat('pt-BR', { dateStyle: 'full', timeStyle: 'short', timeZone: 'America/Sao_Paulo' }).format(now);
-  
+
   const systemPrompt = buildSystemPrompt(state, lead, availabilityStr, currentDate);
   console.log(`[agent] Lead ${lead.id} | Phase: ${state.phase} | Msgs: ${state.follow_up_count}`);
 
   // Formata histórico para o OpenAI
-  const messages: {role: string; content: string}[] = [];
+  const messages: { role: string; content: string }[] = [];
 
   messages.push({
     role: 'system',
@@ -279,7 +279,7 @@ export async function generateAgentReply(
       // Extrai apenas o objeto JSON caso a IA envie texto solto junto
       const jsonMatch = clean.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
-         clean = jsonMatch[0];
+        clean = jsonMatch[0];
       }
       parsed = JSON.parse(clean);
     } catch {
@@ -288,15 +288,15 @@ export async function generateAgentReply(
     }
 
 
-    const score     = Number(parsed.score ?? 0);
-    const phase     = String(parsed.phase ?? state.phase);
+    const score = Number(parsed.score ?? 0);
+    const phase = String(parsed.phase ?? state.phase);
     const nextStage = (parsed.next_stage as number | null) ?? null;
-    const notes     = String(parsed.notes ?? '');
-    
+    const notes = String(parsed.notes ?? '');
+
     // OpenAI sometimes hallucinates the key name instead of "reply"
     const rawReplyValue = parsed.reply || parsed.resposta || parsed.mensagem || parsed.message || parsed.response || '';
     let finalReply = String(rawReplyValue).trim();
-    
+
     // Se a IA devolver completamente vazio por algum outro erro, responde humano
     if (!finalReply) {
       finalReply = 'Deu um pequeno erro de comunicação aqui no meu sistema, mas já estou de volta! Pode me confirmar onde tínhamos parado?';
@@ -305,11 +305,11 @@ export async function generateAgentReply(
     const schedule = parsed.schedule as ScheduleAction | undefined;
 
     return {
-      reply:    finalReply,
+      reply: finalReply,
       newPhase: phase,
       spinData: {},
-      name:     parsed.name ? String(parsed.name) : undefined,
-      email:    parsed.email ? String(parsed.email) : undefined,
+      name: parsed.name ? String(parsed.name) : undefined,
+      email: parsed.email ? String(parsed.email) : undefined,
       score,
       nextStage,
       notes,
@@ -319,12 +319,12 @@ export async function generateAgentReply(
     console.error('[generateAgentReply] Erro fatal:', error);
     const errMsg = error?.message ? String(error.message) : 'Erro desconhecido';
     return {
-      reply:    `[🚨 Erro de IA: não consegui gerar a resposta. Verifique a chave de API da OpenAI. Detalhe: ${errMsg.substring(0, 60)}]`,
+      reply: `[🚨 Erro de IA: não consegui gerar a resposta. Verifique a chave de API da OpenAI. Detalhe: ${errMsg.substring(0, 60)}]`,
       newPhase: state.phase,
       spinData: {},
-      score:    0,
+      score: 0,
       nextStage: null,
-      notes:    lead.notes || '',
+      notes: lead.notes || '',
     };
   }
 }
