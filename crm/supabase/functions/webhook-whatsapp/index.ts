@@ -315,8 +315,35 @@ async function processMessage(jid: string, userText: string, instanceName?: stri
   let { reply: rawReply, newPhase, spinData, name: collectedName, email: collectedEmail, score, nextStage, notes, schedule } =
     await generateAgentReply(history ?? [], agentInput, lead, availabilityStr);
 
-  // ── Trata agendamento via JSON ou fallback ───────────────
   let reply = rawReply;
+
+  // ── FORÇA AGENDAMENTO SE A IA USOU A TAG MAS ESQUECEU O JSON ──
+  const forcedBooking = !schedule || schedule.action !== 'book';
+  const hasBookingTag = reply.includes('[REUNIÃO_AGENDADA_AQUI]');
+  
+  if (hasBookingTag && forcedBooking && (collectedEmail || lead.email)) {
+    console.log(`[calendar] Detectada tag de agendamento sem action "book". Tentando recuperar...`);
+    // Tenta extrair a data do texto se a IA não mandou no JSON
+    if (!schedule?.time) {
+      // Fallback: se não tem hora no JSON, tenta pegar a última sugerida ou usa o horário atual + 1h como segurança
+      // Mas o ideal é que a IA mande. Vamos apenas marcar como 'book' para tentar entrar na lógica.
+      if (!schedule) (schedule as any) = { action: 'book' };
+      else schedule.action = 'book';
+      
+      // Se não tem time, vamos tentar "chutar" um horário razoável ou deixar o erro pegar depois
+      // para não criar algo no passado.
+      if (!schedule.time) {
+         // Tenta extrair algo como "2026-04-20 10:00" ou similar do texto
+         const dateMatch = reply.match(/(\d{4}-\d{2}-\d{2} \d{2}:\d{2})/);
+         if (dateMatch) {
+            schedule.time = dateMatch[0];
+         }
+      }
+    } else {
+      schedule.action = 'book';
+    }
+  }
+
   if (schedule && schedule.action === 'book' && schedule.time) {
     // Substitui espaco por T caso a IA envie "2026-04-13 08:00" sem o T
     let safeTime = schedule.time.trim().replace(' ', 'T');
