@@ -198,7 +198,7 @@ Avalie a maturidade do lead com base nas informações compartilhadas e defina o
   1. Se o lead aceitou a reunião: confirme o horário, peça o e-mail (se não tiver) e use "action": "suggest".
   2. Assim que o lead enviar o e-mail: responda confirmando que o convite foi enviado e USE OBRIGATORIAMENTE "action": "book".
 
-- **IMPORTANTE:** Ao usar "action": "book", você DEVE incluir a tag `[REUNIÃO_AGENDADA_AQUI]` no final da sua mensagem de confirmação para que o sistema injete o link da sala.
+- **IMPORTANTE:** Ao usar "action": "book", você DEVE incluir a tag [REUNIÃO_AGENDADA_AQUI] no final da sua mensagem de confirmação para que o sistema injete o link da sala.
 
 ## FORMATO DE RESPOSTA — RETORNE APENAS JSON:
 {
