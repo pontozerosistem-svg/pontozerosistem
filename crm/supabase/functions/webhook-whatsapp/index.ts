@@ -317,30 +317,41 @@ async function processMessage(jid: string, userText: string, instanceName?: stri
 
   let reply = rawReply;
 
-  // ── FORÇA AGENDAMENTO SE A IA USOU A TAG MAS ESQUECEU O JSON ──
-  const forcedBooking = !schedule || schedule.action !== 'book';
+  // ── DETECTOR DE INTENÇÃO DE AGENDAMENTO (Mão de Ferro) ──
+  const textHasConfirmation = /confirmar|confirmado|marcado|agendado|marcar|agendar/i.test(reply);
+  const textHasDateTime = /(\d{1,2}\/\d{1,2})|(\d{1,2}:\d{1,2})|(segunda|terça|quarta|quinta|sexta|sábado|domingo)/i.test(reply);
   const hasBookingTag = reply.includes('[REUNIÃO_AGENDADA_AQUI]');
+  const hasEmail = !!(collectedEmail || lead.email);
   
-  if (hasBookingTag && forcedBooking && (collectedEmail || lead.email)) {
-    console.log(`[calendar] Detectada tag de agendamento sem action "book". Tentando recuperar...`);
-    // Tenta extrair a data do texto se a IA não mandou no JSON
-    if (!schedule?.time) {
-      // Fallback: se não tem hora no JSON, tenta pegar a última sugerida ou usa o horário atual + 1h como segurança
-      // Mas o ideal é que a IA mande. Vamos apenas marcar como 'book' para tentar entrar na lógica.
-      if (!schedule) (schedule as any) = { action: 'book' };
-      else schedule.action = 'book';
-      
-      // Se não tem time, vamos tentar "chutar" um horário razoável ou deixar o erro pegar depois
-      // para não criar algo no passado.
-      if (!schedule.time) {
-         // Tenta extrair algo como "2026-04-20 10:00" ou similar do texto
-         const dateMatch = reply.match(/(\d{4}-\d{2}-\d{2} \d{2}:\d{2})/);
-         if (dateMatch) {
-            schedule.time = dateMatch[0];
-         }
-      }
-    } else {
-      schedule.action = 'book';
+  // Se a IA sinalizou agendamento no texto mas não mandou o comando JSON correto, nós forçamos.
+  if ((hasBookingTag || (textHasConfirmation && textHasDateTime)) && hasEmail && (!schedule || schedule.action !== 'book')) {
+    console.log(`[calendar] Forçando agendamento baseado na intenção detectada no texto.`);
+    if (!schedule) (schedule as any) = { action: 'book' };
+    else schedule.action = 'book';
+    
+    // Tenta extrair a data/hora do JSON se existir, ou do texto
+    if (!schedule.time) {
+       const timeMatch = reply.match(/(\d{1,2}:\d{1,2})/);
+       if (timeMatch) {
+          const hours = timeMatch[1] || timeMatch[0];
+          // Se mencionou dia da semana, tenta calcular
+          const weekdays = ['domingo', 'segunda', 'terça', 'quarta', 'quinta', 'sexta', 'sábado'];
+          const foundDay = weekdays.findIndex(d => reply.toLowerCase().includes(d));
+          
+          let targetDate = new Date(new Date().toLocaleString("en-US", { timeZone: "America/Sao_Paulo" }));
+          if (foundDay !== -1) {
+             const currentDay = targetDate.getDay();
+             let daysUntil = (foundDay - currentDay + 7) % 7;
+             if (daysUntil === 0) daysUntil = 7; // Se for hoje, assume próxima semana
+             targetDate.setDate(targetDate.getDate() + daysUntil);
+          }
+          
+          const YYYY = targetDate.getFullYear();
+          const MM = String(targetDate.getMonth() + 1).padStart(2, '0');
+          const DD = String(targetDate.getDate()).padStart(2, '0');
+          schedule.time = `${YYYY}-${MM}-${DD} ${hours}`;
+          console.log(`[calendar] Data calculada via fallback: ${schedule.time}`);
+       }
     }
   }
 
