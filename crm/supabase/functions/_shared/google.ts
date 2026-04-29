@@ -40,8 +40,7 @@ export async function createCalendarEvent(
     description: string;
     start: string; // ISO String
     end: string;   // ISO String
-    attendeeEmail: string;
-    attendeeName: string;
+    attendees: { email: string; displayName?: string }[];
   }
 ) {
   const event = {
@@ -49,9 +48,7 @@ export async function createCalendarEvent(
     description: eventData.description,
     start: { dateTime: eventData.start, timeZone: 'America/Sao_Paulo' },
     end: { dateTime: eventData.end, timeZone: 'America/Sao_Paulo' },
-    attendees: [
-      { email: eventData.attendeeEmail, displayName: eventData.attendeeName }
-    ],
+    attendees: eventData.attendees,
     conferenceData: {
       createRequest: {
         requestId: crypto.randomUUID(),

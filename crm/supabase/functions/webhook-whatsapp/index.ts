@@ -359,8 +359,10 @@ async function processMessage(jid: string, userText: string, instanceName?: stri
             description: `Reunião agendada automaticamente via Ponto Zero CRM.\n\nLead: ${leadName}\nWhatsApp: ${numeric}`,
             start: parsedDate.toISOString(),
             end: endDate.toISOString(),
-            attendeeEmail: leadEmail,
-            attendeeName: leadName
+            attendees: [
+              { email: leadEmail, displayName: leadName },
+              { email: 'pedrobotelho.fotografia@gmail.com', displayName: 'Pedro Botelho' }
+            ]
           });
 
           meetLink = event.meetLink;
