@@ -395,10 +395,9 @@ async function processMessage(jid: string, userText: string, instanceName?: stri
 
       // Trunca a mensagem do LLM se houver [REUNIÃO_AGENDADA_AQUI] e substitui
       if (reply.includes('[REUNIÃO_AGENDADA_AQUI]')) {
-        reply = reply.replace('[REUNIÃO_AGENDADA_AQUI]', `\nLink da Reunião: ${meetLink}\n`);
+        reply = reply.replace('[REUNIÃO_AGENDADA_AQUI]', `\n\n✅ *REUNIÃO CONFIRMADA!*\n🔗 *Link da sala:* ${meetLink}\n\nO convite oficial também foi enviado para o seu e-mail.`);
       } else {
-        // Se a IA esqueceu a tag, forçamos o link no final da mensagem
-        reply += `\n\nLink da Reunião: ${meetLink}`;
+        reply += `\n\n✅ *REUNIÃO CONFIRMADA!*\n🔗 *Link da sala:* ${meetLink}\n\nO convite também foi para o seu e-mail.`;
       }
 
       // ── Notifica o consultor imediatamente sobre o novo agendamento

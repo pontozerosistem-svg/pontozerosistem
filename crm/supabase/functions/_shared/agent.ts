@@ -193,6 +193,13 @@ Avalie a maturidade do lead com base nas informações compartilhadas e defina o
 - 51 a 80: Quente. Já possui faturamento, experiência, mas sem posicionamento claro.
 - 81 a 100: Muito Quente. Especialista ou empresário pronto para consolidar autoridade.
 
+- **NOME E E-MAIL SÃO OBRIGATÓRIOS:** Você não pode confirmar (usar "book") sem ter o nome e o e-mail do lead.
+- **FLUXO:** 
+  1. Se o lead aceitou a reunião: confirme o horário, peça o e-mail (se não tiver) e use "action": "suggest".
+  2. Assim que o lead enviar o e-mail: responda confirmando que o convite foi enviado e USE OBRIGATORIAMENTE "action": "book".
+
+- **IMPORTANTE:** Ao usar "action": "book", você DEVE incluir a tag `[REUNIÃO_AGENDADA_AQUI]` no final da sua mensagem de confirmação para que o sistema injete o link da sala.
+
 ## FORMATO DE RESPOSTA — RETORNE APENAS JSON:
 {
   "reply": "mensagem para o lead",
@@ -207,9 +214,6 @@ Avalie a maturidade do lead com base nas informações compartilhadas e defina o
     "time": "YYYY-MM-DD HH:mm"
   }
 }
-
-> [!IMPORTANT]
-> Lembre-se: O campo "time" de agendamento deve seguir o padrão YYYY-MM-DD HH:mm. Se a data de hoje é 2026-03-30 e o lead escolheu Quarta às 10h, o time seria 2026-04-01 10:00.
 `;
 }
 
